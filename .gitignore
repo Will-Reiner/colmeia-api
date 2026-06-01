@@ -1,0 +1,14 @@
+node_modules/
+npm-debug.log*
+
+# Banco de dados SQLite (dados locais nao versionados)
+data/*.db
+data/*.db-shm
+data/*.db-wal
+
+# Variaveis de ambiente
+.env
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,22 @@
+{
+  "name": "colmeia-api",
+  "version": "1.0.0",
+  "description": "API + dashboard para monitoramento de colmeia (TCC Engenharia Mecatronica)",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "seed": "node seed.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "better-sqlite3": "^11.8.1",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "morgan": "^1.10.0",
+    "zod": "^3.24.1"
+  }
+}

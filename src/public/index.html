@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Monitoramento de Colmeia</title>
+  <link rel="stylesheet" href="/style.css" />
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <h1>Monitoramento de Colmeia</h1>
+        <span class="subtitle">Sistema de sensoriamento ESP32 &middot; TCC</span>
+      </div>
+      <div class="controls">
+        <label for="device-select" class="control-label">Dispositivo</label>
+        <select id="device-select" class="select">
+          <option value="">Todos</option>
+        </select>
+
+        <label for="range-select" class="control-label">Periodo</label>
+        <select id="range-select" class="select">
+          <option value="1">1h</option>
+          <option value="6">6h</option>
+          <option value="24" selected>24h</option>
+          <option value="168">7d</option>
+        </select>
+
+        <span id="last-update" class="last-update" title="Ultima atualizacao">&mdash;</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- Cards de status atual -->
+    <section class="cards" aria-label="Status atual">
+      <article class="card">
+        <span class="card-label">Temperatura media</span>
+        <span class="card-value" id="card-temp">&mdash;<span class="unit">&deg;C</span></span>
+        <span class="card-sub" id="card-temp-sub">t1 / t2</span>
+      </article>
+      <article class="card">
+        <span class="card-label">Umidade media</span>
+        <span class="card-value" id="card-umid">&mdash;<span class="unit">%</span></span>
+        <span class="card-sub" id="card-umid-sub">u1 / u2</span>
+      </article>
+      <article class="card">
+        <span class="card-label">Peso atual</span>
+        <span class="card-value" id="card-peso">&mdash;<span class="unit">kg</span></span>
+        <span class="card-sub" id="card-peso-sub">&mdash;</span>
+      </article>
+      <article class="card">
+        <span class="card-label">Servo</span>
+        <span class="card-value" id="card-servo">&mdash;</span>
+        <span class="card-sub" id="card-servo-sub">fim de curso</span>
+      </article>
+    </section>
+
+    <!-- Graficos -->
+    <section class="charts" aria-label="Graficos">
+      <div class="chart-card">
+        <h2 class="chart-title">Temperatura (&deg;C)</h2>
+        <div class="chart-box"><canvas id="chart-temp"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h2 class="chart-title">Umidade (%)</h2>
+        <div class="chart-box"><canvas id="chart-umid"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h2 class="chart-title">Peso (kg)</h2>
+        <div class="chart-box"><canvas id="chart-peso"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h2 class="chart-title">Audio RMS</h2>
+        <div class="chart-box"><canvas id="chart-audio"></canvas></div>
+      </div>
+    </section>
+
+    <!-- Tabela -->
+    <section class="table-section" aria-label="Ultimas leituras">
+      <h2 class="section-title">Ultimas 20 leituras</h2>
+      <div class="table-wrap">
+        <table id="readings-table">
+          <thead>
+            <tr>
+              <th data-key="received_at">Recebido</th>
+              <th data-key="device_id">Device</th>
+              <th data-key="timestamp">Timestamp</th>
+              <th data-key="temperatura_1">T1</th>
+              <th data-key="temperatura_2">T2</th>
+              <th data-key="umidade_1">U1</th>
+              <th data-key="umidade_2">U2</th>
+              <th data-key="peso_kg">Peso</th>
+              <th data-key="audio_rms">Audio</th>
+              <th data-key="servo_status">Servo</th>
+              <th data-key="fim_curso">Fim curso</th>
+            </tr>
+          </thead>
+          <tbody id="readings-body">
+            <tr><td colspan="11" class="empty">Carregando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span>Atualizacao automatica a cada 30s</span>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
