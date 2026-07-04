@@ -1,9 +1,10 @@
 'use strict';
-
 /**
  * Endpoints /api/sensor-data*
+ *
+ * Alteracao: aceita o campo `audio_bands` (assinatura espectral do audio,
+ * ~20 valores em dBFS). A persistencia dele fica no db.js (coluna audio_bands).
  */
-
 const express = require('express');
 const { z } = require('zod');
 const db = require('../db');
@@ -25,6 +26,7 @@ const sensorSchema = z.object({
   accel_y: z.number().optional(),
   accel_z: z.number().optional(),
   audio_rms: z.number().optional(),
+  audio_bands: z.array(z.number()).optional(),   // <-- assinatura espectral (vai pro banco)
   servo_status: z.string().optional(),
   fim_curso: z.boolean().optional(),
 }).strict();
@@ -43,7 +45,6 @@ router.post('/sensor-data', (req, res, next) => {
       },
     });
   }
-
   try {
     const id = db.insertReading(parsed.data);
     return res.status(201).json({ status: 'ok', id });
