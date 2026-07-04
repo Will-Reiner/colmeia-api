@@ -14,6 +14,7 @@ const db = require('./db');
 const sensorsRouter = require('./routes/sensors');
 const statsRouter = require('./routes/stats');
 const devicesRouter = require('./routes/devices');
+const audioRouter = require('./routes/audio');
 
 const PORT = Number(process.env.PORT) || 3000;
 const NODE_ENV = process.env.NODE_ENV || 'development';
@@ -49,7 +50,7 @@ api.get('/health', (req, res) => {
 api.use('/', sensorsRouter);
 api.use('/', statsRouter);
 api.use('/', devicesRouter);
-
+api.use('/', audioRouter);
 app.use('/api', api);
 
 // --- Dashboard estatico ----------------------------------------------------
