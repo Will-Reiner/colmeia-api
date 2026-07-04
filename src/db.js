@@ -41,6 +41,7 @@ db.exec(`
     accel_y       REAL,
     accel_z       REAL,
     audio_rms     REAL,
+    audio_bands   TEXT,
     servo_status  TEXT,
     fim_curso     INTEGER
   );
@@ -49,6 +50,13 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_readings_timestamp ON sensor_readings (timestamp);
 `);
 
+// Migracao para bancos que ja existiam sem a coluna audio_bands.
+// (CREATE TABLE IF NOT EXISTS nao altera tabela existente.)
+const colunas = db.prepare('PRAGMA table_info(sensor_readings)').all();
+if (!colunas.some((c) => c.name === 'audio_bands')) {
+  db.exec('ALTER TABLE sensor_readings ADD COLUMN audio_bands TEXT');
+}
+
 // --- Prepared statements ---------------------------------------------------
 
 const insertStmt = db.prepare(`
@@ -56,16 +64,16 @@ const insertStmt = db.prepare(`
     device_id, timestamp, received_at,
     temperatura_1, umidade_1, temperatura_2, umidade_2,
     peso_raw, peso_kg, accel_x, accel_y, accel_z,
-    audio_rms, servo_status, fim_curso
+    audio_rms, audio_bands, servo_status, fim_curso
   ) VALUES (
     @device_id, @timestamp, @received_at,
     @temperatura_1, @umidade_1, @temperatura_2, @umidade_2,
     @peso_raw, @peso_kg, @accel_x, @accel_y, @accel_z,
-    @audio_rms, @servo_status, @fim_curso
+    @audio_rms, @audio_bands, @servo_status, @fim_curso
   )
 `);
 
-// Colunas opcionais: usamos um template com null para campos ausentes.
+// Colunas opcionais simples: usamos um template com null para campos ausentes.
 const OPTIONAL_COLUMNS = [
   'temperatura_1', 'umidade_1', 'temperatura_2', 'umidade_2',
   'peso_raw', 'peso_kg', 'accel_x', 'accel_y', 'accel_z',
@@ -75,6 +83,7 @@ const OPTIONAL_COLUMNS = [
 /**
  * Insere uma leitura. `reading` ja deve estar validado (device_id, timestamp).
  * Campos opcionais ausentes viram NULL. `fim_curso` boolean vira 0/1.
+ * `audio_bands` (array de numeros) e guardado como texto JSON.
  * Retorna o id inserido.
  */
 function insertReading(reading) {
@@ -93,8 +102,25 @@ function insertReading(reading) {
     row[col] = value;
   }
 
+  // audio_bands: array -> JSON string (ou null se ausente/vazio)
+  row.audio_bands = Array.isArray(reading.audio_bands) && reading.audio_bands.length
+    ? JSON.stringify(reading.audio_bands)
+    : null;
+
   const info = insertStmt.run(row);
   return info.lastInsertRowid;
+}
+
+// Converte a coluna audio_bands (texto JSON) de volta para array nas leituras.
+function parseRow(row) {
+  if (row && typeof row.audio_bands === 'string') {
+    try {
+      row.audio_bands = JSON.parse(row.audio_bands);
+    } catch (_) {
+      row.audio_bands = null;
+    }
+  }
+  return row;
 }
 
 /**
@@ -128,7 +154,7 @@ function queryReadings(opts = {}) {
     ORDER BY timestamp DESC, id DESC
     LIMIT @limit
   `;
-  return db.prepare(sql).all(params);
+  return db.prepare(sql).all(params).map(parseRow);
 }
 
 /**
@@ -146,7 +172,7 @@ function latestPerDevice() {
     GROUP BY r.device_id
     ORDER BY r.device_id
   `;
-  return db.prepare(sql).all();
+  return db.prepare(sql).all().map(parseRow);
 }
 
 /**
