@@ -12,12 +12,17 @@ const router = express.Router();
 
 router.get('/stats', (req, res, next) => {
   try {
-    const raw = db.stats24h({ device_id: req.query.device_id || undefined });
+    const hours = toInt(req.query.hours) || 24;
+    const since = toInt(req.query.since) != null
+      ? toInt(req.query.since)
+      : Math.floor(Date.now() / 1000) - hours * 3600;
+
+    const raw = db.stats24h({ device_id: req.query.device_id || undefined, since });
 
     const round = (v) => (v == null ? null : Math.round(v * 100) / 100);
 
     return res.json({
-      window_hours: 24,
+      window_hours: hours,
       count: raw.count,
       temperatura: {
         t1: { min: round(raw.temp1_min), max: round(raw.temp1_max), avg: round(raw.temp1_avg) },
@@ -36,5 +41,11 @@ router.get('/stats', (req, res, next) => {
     return next(err);
   }
 });
+
+function toInt(value) {
+  if (value === undefined || value === null || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.floor(n) : null;
+}
 
 module.exports = router;

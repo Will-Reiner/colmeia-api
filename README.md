@@ -2,13 +2,13 @@
 
 API REST + dashboard web para um sistema de monitoramento de colmeia baseado em
 ESP32 (TCC de Engenharia Mecatronica). O ESP32 coleta leituras de multiplos
-sensores — 2x DHT22 (temperatura/umidade), MPU-6050 (acelerometro), HX711
-(peso bruto), INMP441 (audio: RMS geral + espectro de 20 faixas de 100 Hz) — e
-as envia periodicamente via HTTP POST (telemetria a cada 15 s; clipes de audio
-em rajadas). Este servico recebe e armazena esses dados em SQLite, expoe uma API
+sensores: 2x DHT22 (temperatura/umidade), MPU-6050 (acelerometro), HX711
+(peso bruto), INMP441 (audio: RMS geral + espectro de 20 faixas de 100 Hz) e
+envia periodicamente telemetria via HTTP POST, alem de clipes de audio em
+rajadas. Este servico recebe e armazena esses dados em SQLite, expoe uma API
 REST para consulta/estatisticas e serve um dashboard dark mode (HTML/CSS/JS puro
-+ Chart.js) com cards de status, graficos ao longo do tempo, **espectrograma de
-audio**, tabela das ultimas leituras e atualizacao automatica.
++ Chart.js) com cards de status, graficos ao longo do tempo, espectrograma,
+biblioteca de audio WAV e atualizacao automatica.
 
 > Campos `servo_status`, `fim_curso` e `peso_kg` sao **legado**: o schema ainda
 > os aceita (opcionais), mas o firmware atual (`colmeia_esp.ino`) nao os envia.
@@ -17,17 +17,17 @@ audio**, tabela das ultimas leituras e atualizacao automatica.
 ## Stack
 
 - **Backend:** Node.js + Express
-- **Banco:** SQLite via `better-sqlite3` (sincrono, sem servidor separado)
+- **Banco:** SQLite via `node:sqlite` (sincrono, sem servidor separado)
 - **Validacao:** Zod &nbsp;|&nbsp; **Logs:** morgan &nbsp;|&nbsp; **CORS:** liberado em `/api/*`
 - **Frontend:** HTML + CSS + JS vanilla + Chart.js (via CDN)
-- **Deploy:** Dockerfile (`node:20-alpine`), pronto para Coolify
+- **Deploy:** Dockerfile (`node:24-alpine`), pronto para Coolify
 
 ## Rodar localmente
 
-Pre-requisitos: Node.js >= 18.
+Pre-requisitos: Node.js >= 24.
 
 ```bash
-npm install            # instala dependencias (compila better-sqlite3)
+npm install            # instala dependencias (sem compilacao nativa)
 npm run seed           # opcional: popula ~200 leituras fake das ultimas 24h
 npm start              # sobe o servidor em http://localhost:3000
 ```
@@ -48,6 +48,10 @@ Durante o desenvolvimento, `npm run dev` reinicia o servidor a cada alteracao.
 
 Em producao/Coolify use `DB_PATH=/app/data/colmeia.db` (dentro do volume).
 
+Se estiver no Windows com Node 24, nao precisa baixar Node 20/18: o projeto
+agora usa o SQLite nativo do proprio Node, entao `npm install` deve concluir
+sem toolchain C++.
+
 ## Endpoints da API
 
 | Metodo | Rota                        | Descricao                                                |
@@ -56,8 +60,10 @@ Em producao/Coolify use `DB_PATH=/app/data/colmeia.db` (dentro do volume).
 | POST   | `/api/sensor-data`          | Recebe uma leitura do ESP32. `201 {status, id}`.         |
 | GET    | `/api/sensor-data`          | Ultimas leituras. Query: `device_id`, `limit` (max 1000), `since`, `until`. |
 | GET    | `/api/sensor-data/latest`   | Leitura mais recente de cada device.                     |
-| GET    | `/api/stats`                | Min/max/media (temp, umidade, peso) das ultimas 24h.     |
+| GET    | `/api/stats`                | Min/max/media (temp, umidade, peso, audio) da janela ativa. |
 | GET    | `/api/devices`              | device_ids unicos + timestamp da ultima leitura.         |
+| GET    | `/api/audio`                | Lista as sessoes WAV capturadas pelo ESP32.              |
+| GET    | `/api/audio/file/:day/:name` | Baixa ou reproduz um WAV gerado em uma rajada.           |
 | DELETE | `/api/sensor-data`          | Apaga dados antigos. Query obrigatoria: `older_than`.    |
 
 > **Seguranca:** o `DELETE` (e futuramente o `POST`) deve ser protegido por
@@ -194,7 +200,7 @@ void loop() {
 colmeia-api/
 ├── src/
 │   ├── server.js          # Entry point: Express, middlewares, rotas, shutdown
-│   ├── db.js              # SQLite (better-sqlite3): schema, indices, helpers
+│   ├── db.js              # SQLite (node:sqlite): schema, indices, helpers
 │   ├── routes/
 │   │   ├── sensors.js     # /api/sensor-data*
 │   │   ├── stats.js       # /api/stats

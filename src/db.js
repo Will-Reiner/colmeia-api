@@ -1,10 +1,10 @@
 'use strict';
 
 /**
- * Camada de banco de dados (SQLite via better-sqlite3).
+ * Camada de banco de dados (SQLite via node:sqlite).
  *
- * better-sqlite3 e sincrono: cada chamada retorna o resultado direto,
- * sem callbacks/promises. Simples e rapido, perfeito para este TCC.
+ * O modulo nativo do Node 24 evita compilacao local no Windows e mantem a
+ * API sincrona que o projeto ja usa.
  *
  * Exporta o handle `db` e funcoes helper usadas pelas rotas, para que a
  * logica de SQL fique concentrada aqui (e os routers fiquem finos).
@@ -12,16 +12,16 @@
 
 const fs = require('fs');
 const path = require('path');
-const Database = require('better-sqlite3');
+const { DatabaseSync } = require('node:sqlite');
 
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, '..', 'data', 'colmeia.db');
 
 // Garante que o diretorio do banco exista (ex.: ./data ou /app/data).
 fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
 
-const db = new Database(DB_PATH);
-db.pragma('journal_mode = WAL'); // melhor concorrencia leitura/escrita
-db.pragma('foreign_keys = ON');
+const db = new DatabaseSync(DB_PATH);
+db.exec('PRAGMA journal_mode = WAL'); // melhor concorrencia leitura/escrita
+db.exec('PRAGMA foreign_keys = ON');
 
 // --- Schema / migration (idempotente) ------------------------------------
 

@@ -95,7 +95,10 @@ router.post('/audio',
 );
 
 // ---- GET /api/audio : lista as sessões (JSON) ----
-router.get('/audio', (req, res) => res.json(listar(200)));
+router.get('/audio', (req, res) => {
+  const limit = clampLimit(req.query.limit);
+  return res.json(listar(limit));
+});
 
 // ---- GET /api/audio/file/<dia>/<arquivo>.wav : baixa/toca ----
 router.get('/audio/file/:day/:name', (req, res) => {
@@ -128,6 +131,12 @@ function listar(limit) {
   } catch (e) { console.error('[audio] listar:', e.message); }
   out.sort((a, b) => b.mtime - a.mtime);
   return out.slice(0, limit);
+}
+
+function clampLimit(limit) {
+  const n = Number(limit);
+  if (!Number.isFinite(n) || n <= 0) return 200;
+  return Math.min(Math.floor(n), 200);
 }
 
 // ---- retenção: apaga áudio antigo pra não lotar o disco ----

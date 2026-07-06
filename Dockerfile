@@ -1,9 +1,4 @@
-FROM node:20-alpine
-
-# better-sqlite3 e um modulo nativo: precisa de toolchain para compilar/rebuildar
-# na arquitetura do container. Instalamos as deps de build, e podemos remove-las
-# depois para manter a imagem enxuta.
-RUN apk add --no-cache --virtual .build-deps python3 make g++
+FROM node:24-alpine
 
 WORKDIR /app
 
@@ -11,8 +6,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Instala apenas dependencias de producao (sem devDependencies).
-RUN npm ci --omit=dev \
-    && apk del .build-deps
+RUN npm ci --omit=dev
 
 # Copia o restante do codigo.
 COPY . .

@@ -88,24 +88,25 @@ function run() {
   const placeholders = DEVICES.map(() => '?').join(', ');
   db.db.prepare(`DELETE FROM sensor_readings WHERE device_id IN (${placeholders})`).run(...DEVICES);
 
-  // Transacao para inserir tudo de uma vez (rapido).
-  const insertMany = db.db.transaction((readings) => {
-    for (const r of readings) db.insertReading(r);
-  });
-
-  let total = 0;
-  for (const deviceId of DEVICES) {
-    const readings = [];
-    for (let i = 0; i < READINGS_PER_DEVICE; i++) {
-      const ts = Math.floor(start + i * stepDevice01);
-      readings.push(buildReading(deviceId, ts, i, READINGS_PER_DEVICE));
+  db.db.exec('BEGIN');
+  try {
+    let total = 0;
+    for (const deviceId of DEVICES) {
+      const readings = [];
+      for (let i = 0; i < READINGS_PER_DEVICE; i++) {
+        const ts = Math.floor(start + i * stepDevice01);
+        readings.push(buildReading(deviceId, ts, i, READINGS_PER_DEVICE));
+      }
+      for (const reading of readings) db.insertReading(reading);
+      total += readings.length;
+      console.log(`[seed] ${readings.length} leituras inseridas para ${deviceId}`);
     }
-    insertMany(readings);
-    total += readings.length;
-    console.log(`[seed] ${readings.length} leituras inseridas para ${deviceId}`);
+    db.db.exec('COMMIT');
+    console.log(`[seed] concluido. Total: ${total} leituras nas ultimas 24h.`);
+  } catch (err) {
+    db.db.exec('ROLLBACK');
+    throw err;
   }
-
-  console.log(`[seed] concluido. Total: ${total} leituras nas ultimas 24h.`);
   db.close();
 }
 
