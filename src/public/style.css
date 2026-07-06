@@ -184,70 +184,63 @@ body::before {
   box-shadow: var(--shadow);
 }
 
-.hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.6fr);
-  gap: 1.25rem;
-  padding: 1.5rem;
-  margin-bottom: 1.2rem;
-  background: linear-gradient(145deg, rgba(15, 23, 42, 0.92), rgba(8, 15, 28, 0.82));
-  border-radius: var(--radius-xl);
+/* Card de posicao da colmeia (status textual colorido) */
+.card-status {
+  font-size: clamp(1.3rem, 1.6vw, 1.7rem);
 }
 
-.hero h2 {
-  margin: 0.45rem 0 0.8rem;
-  font-size: clamp(2rem, 4vw, 3.4rem);
-  line-height: 1.02;
-  max-width: 14ch;
-}
+.card-status.status-ok { color: #4ade80; }
+.card-status.status-warn { color: #fbbf24; }
+.card-status.status-danger { color: #f87171; }
 
-.hero p {
-  margin: 0;
-  max-width: 60ch;
-  color: #c9d7ef;
-  font-size: 1.03rem;
-  line-height: 1.6;
-}
-
-.hero-chips {
-  display: flex;
-  gap: 0.65rem;
-  flex-wrap: wrap;
-  margin-top: 1.25rem;
-}
-
-.hero-chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.6rem 0.85rem;
-  border-radius: 999px;
-  background: rgba(12, 20, 36, 0.84);
+/* Secao de termorregulacao */
+.thermo {
+  padding: 1.1rem 1.1rem 1.25rem;
+  margin-bottom: 1.25rem;
+  background: linear-gradient(180deg, var(--bg-panel-2), var(--bg-panel));
   border: 1px solid var(--border);
-  color: #d8e6fb;
-  font-size: 0.88rem;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
 }
 
-.hero-chip-accent {
-  background: linear-gradient(135deg, rgba(14, 165, 233, 0.28), rgba(52, 211, 153, 0.18));
-  border-color: rgba(125, 211, 252, 0.28);
-}
-
-.hero-panel {
+.thermo-grid {
   display: grid;
-  gap: 0.75rem;
-  align-content: start;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.9rem;
+  margin: 0.9rem 0 1.1rem;
 }
 
-.hero-panel-item {
-  padding: 1rem 1.1rem;
+.thermo-tile {
+  padding: 0.95rem 1rem;
+  display: grid;
+  gap: 0.3rem;
+  background: rgba(8, 14, 25, 0.7);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
 }
 
-.hero-panel-item strong {
-  display: block;
-  margin-top: 0.3rem;
-  font-size: 1.5rem;
+.thermo-label {
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+}
+
+.thermo-value {
+  font-family: 'Space Grotesk', 'Manrope', sans-serif;
+  font-size: clamp(1.5rem, 1.8vw, 2rem);
+  font-weight: 700;
   letter-spacing: -0.03em;
 }
+
+.thermo-sub {
+  font-size: 0.82rem;
+  color: #9fb2d0;
+}
+
+.thermo-tile.tile-ok { border-color: rgba(74, 222, 128, 0.4); background: rgba(74, 222, 128, 0.08); }
+.thermo-tile.tile-warn { border-color: rgba(251, 191, 36, 0.4); background: rgba(251, 191, 36, 0.08); }
+.thermo-tile.tile-danger { border-color: rgba(248, 113, 113, 0.4); background: rgba(248, 113, 113, 0.08); }
 
 .cards {
   display: grid;
@@ -581,6 +574,10 @@ td.muted {
   .charts {
     grid-template-columns: 1fr;
   }
+
+  .thermo-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 900px) {
@@ -604,6 +601,10 @@ td.muted {
   }
 
   .cards {
+    grid-template-columns: 1fr;
+  }
+
+  .thermo-grid {
     grid-template-columns: 1fr;
   }
 

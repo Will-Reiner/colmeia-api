@@ -109,6 +109,20 @@ router.get('/audio/file/:day/:name', (req, res) => {
   res.type('audio/wav').sendFile(full);
 });
 
+// Extrai o timestamp (Unix em segundos) do nome do arquivo de audio.
+// Nome: `${device}_${session}_${trigger}.wav`, onde session e o Unix do ESP.
+// device pode conter '_', entao pegamos o penultimo campo (session fica entre
+// os dois ultimos '_'). Se vier em ms (> 1e12), converte para segundos.
+// Sem numero valido, cai no mtime do arquivo (mtimeMs -> segundos).
+function sessionTsFromName(fname, mtimeMs) {
+  const parts = String(fname).replace(/\.wav$/i, '').split('_');
+  const raw = parts.length >= 2 ? Number(parts[parts.length - 2]) : NaN;
+  if (Number.isFinite(raw) && raw > 0) {
+    return raw > 1e12 ? Math.floor(raw / 1000) : Math.floor(raw);
+  }
+  return Math.floor(mtimeMs / 1000);
+}
+
 function listar(limit) {
   const out = [];
   try {
@@ -123,7 +137,10 @@ function listar(limit) {
           file: `${day}/${f}`,
           trigger: f.includes('_anomaly') ? 'anomaly' : 'periodic',
           bytes, duracao_s: +(bytes / (16000 * 2)).toFixed(1),
-          quando: new Date(st.mtimeMs).toISOString().replace('T', ' ').slice(0, 19),
+          // Unix em segundos: mesmo relogio dos sensores (o front formata no
+          // fuso do navegador). Vem da sessao no nome do arquivo; cai no mtime
+          // se o nome nao tiver um numero de sessao valido.
+          timestamp: sessionTsFromName(f, st.mtimeMs),
           mtime: st.mtimeMs
         });
       }

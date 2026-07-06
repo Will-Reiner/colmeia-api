@@ -55,21 +55,21 @@ Os cards de "média" perdem sentido. Redesenho na seção `.cards`:
 
 ### 3. Peso: `raw` → `kg`
 
-Confirmado no firmware (`colmeia_esp.ino`): `scale.set_scale(11039.72)` +
-`set_offset(3264940)` + `get_units()` → o valor **já é kg calibrado**, apenas
-transportado no campo `peso_raw`.
+O firmware foi atualizado para enviar **`peso_kg` (float, com casas decimais)**
+em vez de `peso_raw` (`long`). O backend já suporta: o schema Zod tem
+`peso_kg: z.number().optional()` e a coluna `peso_kg REAL` já existe — sem
+mudança no servidor.
 
 Mudanças (frontend apenas):
-- `pesoInfo(raw)` passa a retornar sempre `{ value: raw, unit: 'kg', decimals: 0 }`.
-  (Remove-se a dependência de `PESO_CAL.factor`, que não se aplica mais.)
-- Card Peso: unidade `raw` → `kg`; sub mantém min/max (agora em kg).
-- Gráfico "Peso bruto (HX711)" → título "Peso (kg)".
-- Tabela: cabeçalho "Peso raw" → "Peso (kg)".
-
-**Nota (fora de escopo, registrada):** `peso_raw` é `long` no firmware e
-`INTEGER` no schema/DB, então o peso chega **sem casas decimais**. Resolução
-decimal exigiria mudar firmware + schema Zod + coluna — não faz parte desta
-entrega. Por isso `decimals: 0`.
+- `pesoInfo(reading)` passa a ler `peso_kg` com **2 casas decimais**, unidade
+  `kg`. Fallback: leituras antigas só têm `peso_raw` (kg inteiro) —
+  `const kg = reading.peso_kg != null ? reading.peso_kg : reading.peso_raw`.
+- Card Peso: unidade → `kg`; sub usa `stats.peso_kg` (com fallback
+  `stats.peso_raw`) para min/max.
+- Gráfico "Peso bruto (HX711)" → título "Peso (kg)"; série passa a plotar
+  `peso_kg` com fallback para `peso_raw`.
+- Tabela: cabeçalho "Peso raw" → "Peso (kg)"; célula formata `peso_kg`
+  (fallback `peso_raw`) com 2 decimais.
 
 ### 4. Acelerômetro → card "Posição da colmeia"
 

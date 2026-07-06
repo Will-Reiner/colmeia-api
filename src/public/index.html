@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#0b1020" />
-  <title>Colmeia 4.0 | Observabilidade</title>
+  <title>Techive</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
@@ -17,9 +17,7 @@
   <header class="topbar">
     <div class="topbar-inner">
       <div class="brand">
-        <span class="eyebrow">Colmeia 4.0</span>
-        <h1>Observabilidade da colmeia</h1>
-        <span class="subtitle">Sensores, audio, aceleracao e espectro em uma interface unica.</span>
+        <h1>Techive</h1>
       </div>
       <div class="controls">
         <label for="device-select" class="control-label">Dispositivo</label>
@@ -41,53 +39,20 @@
   </header>
 
   <main class="container">
-    <section class="hero" aria-label="Resumo do sistema">
-      <div class="hero-copy">
-        <span class="hero-kicker">Audio, sensores e telemetria</span>
-        <h2>Uma leitura viva da colmeia, do campo ao espectro.</h2>
-        <p>
-          Veja temperatura, umidade, peso bruto, RMS de audio, aceleracao, espectro e
-          ouca os clipes WAV capturados pelo ESP32 sem sair da pagina.
-        </p>
-        <div class="hero-chips">
-          <span class="hero-chip">ESP32 dual-core</span>
-          <span class="hero-chip">20 bandas de 100 Hz</span>
-          <span class="hero-chip">Espectrograma</span>
-          <span class="hero-chip">Playback WAV</span>
-          <span class="hero-chip hero-chip-accent" id="hero-device-chip">Todos os devices</span>
-        </div>
-      </div>
-
-      <div class="hero-panel">
-        <div class="hero-panel-item">
-          <span class="panel-label">Ultima leitura</span>
-          <strong id="dashboard-last-reading">&mdash;</strong>
-        </div>
-        <div class="hero-panel-item">
-          <span class="panel-label">Sessoes de audio</span>
-          <strong id="dashboard-audio-count">0</strong>
-        </div>
-        <div class="hero-panel-item">
-          <span class="panel-label">Janela ativa</span>
-          <strong id="dashboard-window">24h</strong>
-        </div>
-      </div>
-    </section>
-
     <section class="cards" aria-label="Status atual">
       <article class="card">
-        <span class="card-label">Temperatura media</span>
+        <span class="card-label">Temperatura interna</span>
         <span class="card-value" id="card-temp">&mdash;<span class="unit">&deg;C</span></span>
-        <span class="card-sub" id="card-temp-sub">t1 / t2</span>
+        <span class="card-sub" id="card-temp-sub">externa &mdash;</span>
       </article>
       <article class="card">
-        <span class="card-label">Umidade media</span>
+        <span class="card-label">Umidade interna</span>
         <span class="card-value" id="card-umid">&mdash;<span class="unit">%</span></span>
-        <span class="card-sub" id="card-umid-sub">u1 / u2</span>
+        <span class="card-sub" id="card-umid-sub">externa &mdash;</span>
       </article>
       <article class="card">
-        <span class="card-label">Peso bruto</span>
-        <span class="card-value" id="card-peso">&mdash;<span class="unit">raw</span></span>
+        <span class="card-label">Peso</span>
+        <span class="card-value" id="card-peso">&mdash;<span class="unit">kg</span></span>
         <span class="card-sub" id="card-peso-sub">HX711</span>
       </article>
       <article class="card">
@@ -95,11 +60,59 @@
         <span class="card-value" id="card-audio">&mdash;<span class="unit">dBFS</span></span>
         <span class="card-sub" id="card-audio-sub">nivel sonoro</span>
       </article>
-      <article class="card">
-        <span class="card-label">Aceleracao</span>
-        <span class="card-value" id="card-accel">&mdash;<span class="unit">m/s&sup2;</span></span>
+      <article class="card" id="card-position">
+        <span class="card-label">Posicao</span>
+        <span class="card-value card-status" id="card-accel">&mdash;</span>
         <span class="card-sub" id="card-accel-sub">MPU-6050</span>
       </article>
+    </section>
+
+    <section class="thermo" aria-label="Termorregulacao">
+      <div class="section-head-inline">
+        <h2 class="section-title section-title-large">Termorregulacao</h2>
+        <span class="chart-meta">janela ativa &middot; interna (T2) vs externa (T1)</span>
+      </div>
+      <div class="thermo-grid">
+        <article class="thermo-tile" id="thermo-temp-ideal">
+          <span class="thermo-label">Interna media</span>
+          <span class="thermo-value" id="thermo-temp-avg">&mdash;<span class="unit">&deg;C</span></span>
+          <span class="thermo-sub" id="thermo-temp-band">faixa 28&ndash;32&deg;C</span>
+        </article>
+        <article class="thermo-tile">
+          <span class="thermo-label">Amortecimento temp.</span>
+          <span class="thermo-value" id="thermo-temp-damp">&mdash;<span class="unit">%</span></span>
+          <span class="thermo-sub" id="thermo-temp-damp-sub">ext &mdash;</span>
+        </article>
+        <article class="thermo-tile">
+          <span class="thermo-label">&Delta;T interna&minus;externa</span>
+          <span class="thermo-value" id="thermo-temp-delta">&mdash;<span class="unit">&deg;C</span></span>
+          <span class="thermo-sub" id="thermo-temp-delta-sub">&mdash;</span>
+        </article>
+        <article class="thermo-tile">
+          <span class="thermo-label">% do tempo na faixa</span>
+          <span class="thermo-value" id="thermo-temp-inband">&mdash;<span class="unit">%</span></span>
+          <span class="thermo-sub">28&ndash;32&deg;C</span>
+        </article>
+        <article class="thermo-tile">
+          <span class="thermo-label">Amortecimento umid.</span>
+          <span class="thermo-value" id="thermo-umid-damp">&mdash;<span class="unit">%</span></span>
+          <span class="thermo-sub" id="thermo-umid-damp-sub">ext &mdash;</span>
+        </article>
+        <article class="thermo-tile">
+          <span class="thermo-label">&Delta;U interna&minus;externa</span>
+          <span class="thermo-value" id="thermo-umid-delta">&mdash;<span class="unit">%</span></span>
+          <span class="thermo-sub">&mdash;</span>
+        </article>
+      </div>
+      <div class="chart-card chart-card-wide">
+        <div class="section-head-inline">
+          <div>
+            <h2 class="chart-title">Temperatura interna vs externa</h2>
+            <span class="spectro-note">Faixa ideal 28&ndash;32&deg;C sombreada. Quanto mais plana a linha interna, melhor a termorregulacao.</span>
+          </div>
+        </div>
+        <div class="chart-box"><canvas id="chart-thermo"></canvas></div>
+      </div>
     </section>
 
     <section class="charts" aria-label="Graficos">
@@ -112,7 +125,7 @@
         <div class="chart-box"><canvas id="chart-umid"></canvas></div>
       </div>
       <div class="chart-card">
-        <h2 class="chart-title">Peso bruto (HX711)</h2>
+        <h2 class="chart-title">Peso (kg)</h2>
         <div class="chart-box"><canvas id="chart-peso"></canvas></div>
       </div>
       <div class="chart-card">
@@ -173,7 +186,7 @@
               <th data-key="temperatura_2">T2</th>
               <th data-key="umidade_1">U1</th>
               <th data-key="umidade_2">U2</th>
-              <th data-key="peso_raw">Peso raw</th>
+              <th data-key="peso_kg">Peso (kg)</th>
               <th data-key="accel_x">Ax</th>
               <th data-key="accel_y">Ay</th>
               <th data-key="accel_z">Az</th>

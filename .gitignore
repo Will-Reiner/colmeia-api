@@ -6,6 +6,9 @@ data/*.db
 data/*.db-shm
 data/*.db-wal
 
+# Clipes de audio recebidos (dados de runtime)
+data/audio/
+
 # Variaveis de ambiente
 .env
 

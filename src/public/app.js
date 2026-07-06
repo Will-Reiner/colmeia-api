@@ -45,7 +45,16 @@ const DB_STOPS = [
   [240, 90, 60],
 ];
 
-const PESO_CAL = { factor: null, offset: 0 };
+// Faixa ideal de temperatura interna da colmeia (°C).
+const IDEAL_TEMP = { min: 28, max: 32 };
+
+// Posicao da colmeia (acelerometro). ACCEL_REF e a direcao da gravidade com a
+// colmeia em repouso, normalizada (de (0.05, 2.85, 8.65) medido). O angulo de
+// inclinacao e o angulo entre a leitura atual (normalizada) e essa referencia.
+// Para recalibrar: capture uma leitura em repouso e normalize (x,y,z)/|v|.
+const ACCEL_REF = { x: 0.006, y: 0.313, z: 0.950 };
+const TILT_OK_DEG = 15;    // < 15°  = no lugar
+const TILT_WARN_DEG = 45;  // 15–45° = inclinada ; > 45° = derrubada
 
 window.addEventListener('DOMContentLoaded', () => {
   setupControls();
@@ -112,10 +121,10 @@ async function refresh() {
 
     updateDeviceOptions(devicesRes.data || []);
     renderOverview(selectReferenceReading(state.latestReadings), statsRes);
+    renderThermoregulation(statsRes, state.lastSeries);
     renderCharts(state.lastSeries);
     renderTable(state.lastReadings);
     renderAudioLibrary(state.audioFiles);
-    updateDashboardMeta();
     updateLastUpdate();
   } catch (error) {
     console.error('Falha ao atualizar dashboard:', error);
@@ -138,20 +147,6 @@ function selectReferenceReading(readings) {
 }
 
 function renderOverview(reading, stats) {
-  const deviceChip = document.getElementById('hero-device-chip');
-  const lastReading = document.getElementById('dashboard-last-reading');
-  const audioCount = document.getElementById('dashboard-audio-count');
-  const windowLabel = document.getElementById('dashboard-window');
-
-  if (deviceChip) deviceChip.textContent = state.deviceId ? `Device: ${state.deviceId}` : 'Todos os devices';
-  if (lastReading) {
-    lastReading.textContent = reading
-      ? `${reading.device_id} • ${formatDateTime(reading.timestamp)}`
-      : 'Sem leitura recente';
-  }
-  if (audioCount) audioCount.textContent = String(state.audioFiles.length);
-  if (windowLabel) windowLabel.textContent = `${state.rangeHours}h`;
-
   const tempEl = document.getElementById('card-temp');
   const tempSub = document.getElementById('card-temp-sub');
   const umidEl = document.getElementById('card-umid');
@@ -166,37 +161,47 @@ function renderOverview(reading, stats) {
   if (!reading) {
     tempEl.innerHTML = '&mdash;<span class="unit">&deg;C</span>';
     umidEl.innerHTML = '&mdash;<span class="unit">%</span>';
-    pesoEl.innerHTML = '&mdash;<span class="unit">raw</span>';
+    pesoEl.innerHTML = '&mdash;<span class="unit">kg</span>';
     audioEl.innerHTML = '&mdash;<span class="unit">dBFS</span>';
-    accelEl.innerHTML = '&mdash;<span class="unit">m/s&sup2;</span>';
+    accelEl.textContent = '—';
+    accelEl.className = 'card-value card-status';
     return;
   }
 
-  const tempAvg = avg([reading.temperatura_1, reading.temperatura_2]);
-  const umidAvg = avg([reading.umidade_1, reading.umidade_2]);
-  const peso = pesoInfo(reading.peso_raw);
-  const accel = accelMag(reading);
+  // Interna = T2/U2 ; externa = T1/U1.
+  const tIn = reading.temperatura_2;
+  const tOut = reading.temperatura_1;
+  const uIn = reading.umidade_2;
+  const uOut = reading.umidade_1;
+  const peso = pesoInfo(reading);
+  const pos = tiltInfo(reading);
 
-  tempEl.innerHTML = `${fmt(tempAvg, 1)}<span class="unit">&deg;C</span>`;
-  tempSub.textContent = `T1 ${fmt(reading.temperatura_1, 1)} / T2 ${fmt(reading.temperatura_2, 1)}`;
+  tempEl.innerHTML = `${fmt(tIn, 1)}<span class="unit">&deg;C</span>`;
+  tempSub.textContent = tOut != null
+    ? `externa ${fmt(tOut, 1)}°C · Δ ${signed(diff(tIn, tOut), 1)}°C`
+    : 'externa —';
 
-  umidEl.innerHTML = `${fmt(umidAvg, 1)}<span class="unit">%</span>`;
-  umidSub.textContent = `U1 ${fmt(reading.umidade_1, 1)} / U2 ${fmt(reading.umidade_2, 1)}`;
+  umidEl.innerHTML = `${fmt(uIn, 1)}<span class="unit">%</span>`;
+  umidSub.textContent = uOut != null
+    ? `externa ${fmt(uOut, 1)}% · Δ ${signed(diff(uIn, uOut), 1)}`
+    : 'externa —';
 
   pesoEl.innerHTML = `${fmt(peso.value, peso.decimals)}<span class="unit">${peso.unit}</span>`;
-  pesoSub.textContent = stats && stats.peso_raw && stats.peso_raw.min != null
-    ? `min ${fmt(stats.peso_raw.min, 0)} / max ${fmt(stats.peso_raw.max, 0)} (24h)`
+  const pstat = stats && stats.peso_kg && stats.peso_kg.min != null
+    ? stats.peso_kg
+    : (stats && stats.peso_raw && stats.peso_raw.min != null ? stats.peso_raw : null);
+  pesoSub.textContent = pstat
+    ? `min ${fmt(pstat.min, 2)} / max ${fmt(pstat.max, 2)} kg (${state.rangeHours}h)`
     : 'HX711';
 
   audioEl.innerHTML = `${fmt(reading.audio_rms, 1)}<span class="unit">dBFS</span>`;
   audioSub.textContent = stats && stats.audio_rms && stats.audio_rms.avg != null
-    ? `media ${fmt(stats.audio_rms.avg, 1)} dBFS (24h)`
+    ? `media ${fmt(stats.audio_rms.avg, 1)} dBFS (${state.rangeHours}h)`
     : 'nivel sonoro';
 
-  accelEl.innerHTML = `${fmt(accel, 2)}<span class="unit">m/s&sup2;</span>`;
-  accelSub.textContent = reading.accel_x != null
-    ? `x ${fmt(reading.accel_x, 2)} • y ${fmt(reading.accel_y, 2)} • z ${fmt(reading.accel_z, 2)}`
-    : 'acelerometro';
+  accelEl.textContent = pos.label;
+  accelEl.className = `card-value card-status ${pos.cls}`;
+  accelSub.textContent = pos.angle != null ? `inclinacao ${fmt(pos.angle, 0)}°` : 'acelerometro';
 }
 
 function initCharts() {
@@ -211,7 +216,7 @@ function initCharts() {
   ]);
 
   charts.peso = makeLineChart('chart-peso', [
-    { key: 'peso_raw', label: 'Peso bruto', color: COLORS.peso },
+    { key: 'peso_kg', fallback: 'peso_raw', label: 'Peso (kg)', color: COLORS.peso },
   ]);
 
   charts.audio = makeLineChart('chart-audio', [
@@ -224,13 +229,38 @@ function initCharts() {
     { key: 'accel_z', label: 'Z', color: COLORS.az },
   ]);
 
+  // Interna (T2) vs externa (T1) com a faixa ideal 28–32°C sombreada.
+  charts.thermo = makeLineChart('chart-thermo', [
+    { key: 'temperatura_2', label: 'Interna (T2)', color: COLORS.t1 },
+    { key: 'temperatura_1', label: 'Externa (T1)', color: COLORS.u2 },
+  ], [idealBandPlugin]);
+
   charts.spectrum = makeSpectrumChart('chart-spectrum');
 }
 
-function makeLineChart(canvasId, series) {
+// Plugin Chart.js inline: sombreia a faixa ideal de temperatura no fundo.
+const idealBandPlugin = {
+  id: 'idealBand',
+  beforeDatasetsDraw(chart) {
+    const { ctx, chartArea, scales } = chart;
+    const y = scales.y;
+    if (!y || !chartArea) return;
+    const yHi = y.getPixelForValue(IDEAL_TEMP.max);
+    const yLo = y.getPixelForValue(IDEAL_TEMP.min);
+    const top = Math.min(yHi, yLo);
+    const height = Math.abs(yLo - yHi);
+    ctx.save();
+    ctx.fillStyle = 'rgba(45, 212, 191, 0.12)';
+    ctx.fillRect(chartArea.left, top, chartArea.right - chartArea.left, height);
+    ctx.restore();
+  },
+};
+
+function makeLineChart(canvasId, series, plugins) {
   const ctx = document.getElementById(canvasId).getContext('2d');
   return new Chart(ctx, {
     type: 'line',
+    plugins: plugins || [],
     data: {
       labels: [],
       datasets: series.map((serie) => ({
@@ -244,6 +274,7 @@ function makeLineChart(canvasId, series) {
         tension: 0.28,
         spanGaps: true,
         _key: serie.key,
+        _fallback: serie.fallback,
       })),
     },
     options: {
@@ -324,10 +355,14 @@ function makeSpectrumChart(canvasId) {
 function renderCharts(readings) {
   const labels = readings.map((reading) => formatClock(reading.timestamp));
 
-  [charts.temp, charts.umid, charts.peso, charts.audio, charts.accel].forEach((chart) => {
+  [charts.temp, charts.umid, charts.peso, charts.audio, charts.accel, charts.thermo].forEach((chart) => {
     chart.data.labels = labels;
     chart.data.datasets.forEach((dataset) => {
-      dataset.data = readings.map((reading) => (reading[dataset._key] != null ? reading[dataset._key] : null));
+      dataset.data = readings.map((reading) => {
+        let value = reading[dataset._key];
+        if (value == null && dataset._fallback) value = reading[dataset._fallback];
+        return value != null ? value : null;
+      });
     });
     chart.update('none');
   });
@@ -450,7 +485,7 @@ function renderTable(readings) {
       <td class="num">${fmt(reading.temperatura_2, 1)}</td>
       <td class="num">${fmt(reading.umidade_1, 1)}</td>
       <td class="num">${fmt(reading.umidade_2, 1)}</td>
-      <td class="num">${fmt(reading.peso_raw, 0)}</td>
+      <td class="num">${fmt(reading.peso_kg != null ? reading.peso_kg : reading.peso_raw, 2)}</td>
       <td class="num">${fmt(reading.accel_x, 2)}</td>
       <td class="num">${fmt(reading.accel_y, 2)}</td>
       <td class="num">${fmt(reading.accel_z, 2)}</td>
@@ -480,7 +515,7 @@ function renderAudioLibrary(files) {
       <article class="audio-card">
         <div class="audio-card-head">
           <span class="audio-tag ${tagClass}">${escapeHtml(file.trigger || 'periodic')}</span>
-          <span class="audio-meta">${escapeHtml(file.quando || '—')}</span>
+          <span class="audio-meta">${escapeHtml(formatDateTime(file.timestamp))}</span>
         </div>
         <h3>${escapeHtml(file.file)}</h3>
         <p>${fmt(file.duracao_s, 1)} s · ${bytesLabel(file.bytes)}</p>
@@ -489,6 +524,67 @@ function renderAudioLibrary(files) {
       </article>
     `;
   }).join('');
+}
+
+// Termorregulacao: quanto a colmeia amortece a variacao do ambiente e se a
+// temperatura interna esta na faixa ideal. Usa /api/stats (min/max/avg) e a
+// serie da janela (para o % do tempo na faixa).
+function renderThermoregulation(stats, series) {
+  const setText = (id, text) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+  };
+  const setValue = (id, value, unit) => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = `${value}${unit ? `<span class="unit">${unit}</span>` : ''}`;
+  };
+
+  const t = stats && stats.temperatura;
+  const u = stats && stats.umidade;
+
+  // --- Temperatura interna media + status vs faixa ideal ---
+  const tInAvg = t && t.t2 ? t.t2.avg : null;
+  setValue('thermo-temp-avg', fmt(tInAvg, 1), '&deg;C');
+  const idealTile = document.getElementById('thermo-temp-ideal');
+  if (idealTile) {
+    idealTile.classList.remove('tile-ok', 'tile-warn', 'tile-danger');
+    if (tInAvg != null) {
+      const inBand = tInAvg >= IDEAL_TEMP.min && tInAvg <= IDEAL_TEMP.max;
+      const near = tInAvg >= IDEAL_TEMP.min - 2 && tInAvg <= IDEAL_TEMP.max + 2;
+      idealTile.classList.add(inBand ? 'tile-ok' : (near ? 'tile-warn' : 'tile-danger'));
+    }
+  }
+  setText('thermo-temp-band', tInAvg == null
+    ? `faixa ${IDEAL_TEMP.min}–${IDEAL_TEMP.max}°C`
+    : (tInAvg < IDEAL_TEMP.min ? `abaixo da faixa (${IDEAL_TEMP.min}–${IDEAL_TEMP.max}°C)`
+      : (tInAvg > IDEAL_TEMP.max ? `acima da faixa (${IDEAL_TEMP.min}–${IDEAL_TEMP.max}°C)`
+        : `dentro da faixa ${IDEAL_TEMP.min}–${IDEAL_TEMP.max}°C`)));
+
+  // --- Amortecimento de temperatura ---
+  const ampTout = t && t.t1 ? amplitude(t.t1) : null;
+  const ampTin = t && t.t2 ? amplitude(t.t2) : null;
+  const dampT = dampening(ampTin, ampTout);
+  setValue('thermo-temp-damp', fmt(dampT, 0), '%');
+  setText('thermo-temp-damp-sub', ampTout != null ? `ext oscilou ${fmt(ampTout, 1)}°C` : 'ext —');
+
+  // --- Delta T interna - externa ---
+  const dT = (t && t.t2 && t.t1) ? diff(t.t2.avg, t.t1.avg) : null;
+  setValue('thermo-temp-delta', signed(dT, 1), '&deg;C');
+  setText('thermo-temp-delta-sub', dT == null ? '—' : (dT >= 0 ? 'aquecendo' : 'resfriando'));
+
+  // --- % do tempo na faixa ideal (serie) ---
+  const pct = pctInBand(series, 'temperatura_2', IDEAL_TEMP.min, IDEAL_TEMP.max);
+  setValue('thermo-temp-inband', fmt(pct, 0), '%');
+
+  // --- Umidade (sem faixa ideal): amortecimento + delta ---
+  const ampUout = u && u.u1 ? amplitude(u.u1) : null;
+  const ampUin = u && u.u2 ? amplitude(u.u2) : null;
+  const dampU = dampening(ampUin, ampUout);
+  setValue('thermo-umid-damp', fmt(dampU, 0), '%');
+  setText('thermo-umid-damp-sub', ampUout != null ? `ext oscilou ${fmt(ampUout, 1)}%` : 'ext —');
+
+  const dU = (u && u.u2 && u.u1) ? diff(u.u2.avg, u.u1.avg) : null;
+  setValue('thermo-umid-delta', signed(dU, 1), '%');
 }
 
 function updateDeviceOptions(devices) {
@@ -507,11 +603,6 @@ function updateDeviceOptions(devices) {
     });
 
   select.value = state.deviceId;
-}
-
-function updateDashboardMeta() {
-  const label = document.getElementById('dashboard-window');
-  if (label) label.textContent = `${state.rangeHours}h`;
 }
 
 function updateLastUpdate() {
@@ -593,10 +684,44 @@ function nowUnix() {
   return Math.floor(Date.now() / 1000);
 }
 
-function avg(values) {
-  const nums = values.filter((value) => value != null && !Number.isNaN(value));
-  if (!nums.length) return null;
-  return nums.reduce((acc, value) => acc + value, 0) / nums.length;
+function diff(a, b) {
+  if (a == null || b == null || Number.isNaN(a) || Number.isNaN(b)) return null;
+  return a - b;
+}
+
+// "+x.x" / "-x.x" (ou "—" se nulo).
+function signed(value, decimals) {
+  if (value == null || Number.isNaN(value)) return '—';
+  const s = Number(value).toFixed(decimals);
+  return value > 0 ? `+${s}` : s;
+}
+
+// Amplitude (max - min) de um stat { min, max }.
+function amplitude(stat) {
+  if (!stat || stat.min == null || stat.max == null) return null;
+  return stat.max - stat.min;
+}
+
+// Amortecimento: quanto da variacao externa a colmeia absorveu, em %.
+// 100% = interna totalmente estavel; 0% = varia igual ao ambiente.
+function dampening(ampIn, ampOut) {
+  if (ampIn == null || ampOut == null || ampOut <= 0) return null;
+  const d = (1 - ampIn / ampOut) * 100;
+  return Math.max(0, Math.min(100, d));
+}
+
+// % das leituras de `key` na serie que caem em [lo, hi].
+function pctInBand(series, key, lo, hi) {
+  if (!Array.isArray(series) || !series.length) return null;
+  let valid = 0;
+  let inBand = 0;
+  series.forEach((r) => {
+    const v = r[key];
+    if (v == null || Number.isNaN(v)) return;
+    valid += 1;
+    if (v >= lo && v <= hi) inBand += 1;
+  });
+  return valid ? (inBand / valid) * 100 : null;
 }
 
 function fmt(value, decimals) {
@@ -604,20 +729,34 @@ function fmt(value, decimals) {
   return Number(value).toFixed(decimals);
 }
 
-function pesoInfo(raw) {
-  if (raw == null) return { value: null, unit: 'raw', decimals: 0 };
-  if (PESO_CAL.factor) {
-    return { value: (raw - PESO_CAL.offset) / PESO_CAL.factor, unit: 'kg', decimals: 2 };
-  }
-  return { value: raw, unit: 'raw', decimals: 0 };
+// Peso ja vem em kg (campo peso_kg, float). Leituras antigas so tem peso_raw
+// (kg inteiro): usamos como fallback para nao quebrar o historico.
+function pesoInfo(reading) {
+  const kg = reading.peso_kg != null ? reading.peso_kg : reading.peso_raw;
+  if (kg == null) return { value: null, unit: 'kg', decimals: 2 };
+  return { value: kg, unit: 'kg', decimals: 2 };
 }
 
-function accelMag(reading) {
-  if (reading.accel_x == null && reading.accel_y == null && reading.accel_z == null) return null;
+// Posicao da colmeia: angulo entre o vetor de aceleracao atual e a referencia
+// de repouso (ACCEL_REF). Independe da magnitude (normaliza os dois vetores),
+// entao nao importa se |g| medido nao e exatamente 9.81.
+function tiltInfo(reading) {
+  if (reading.accel_x == null && reading.accel_y == null && reading.accel_z == null) {
+    return { angle: null, label: '—', cls: '' };
+  }
   const x = reading.accel_x || 0;
   const y = reading.accel_y || 0;
   const z = reading.accel_z || 0;
-  return Math.sqrt(x * x + y * y + z * z);
+  const mag = Math.sqrt(x * x + y * y + z * z);
+  if (mag < 1e-6) return { angle: null, label: '—', cls: '' };
+
+  const refMag = Math.sqrt(ACCEL_REF.x ** 2 + ACCEL_REF.y ** 2 + ACCEL_REF.z ** 2);
+  const cos = (x * ACCEL_REF.x + y * ACCEL_REF.y + z * ACCEL_REF.z) / (mag * refMag);
+  const angle = Math.acos(Math.max(-1, Math.min(1, cos))) * 180 / Math.PI;
+
+  if (angle < TILT_OK_DEG) return { angle, label: 'No lugar', cls: 'status-ok' };
+  if (angle < TILT_WARN_DEG) return { angle, label: 'Inclinada', cls: 'status-warn' };
+  return { angle, label: 'Derrubada', cls: 'status-danger' };
 }
 
 function clamp01(value) {
