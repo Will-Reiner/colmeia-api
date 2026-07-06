@@ -48,12 +48,18 @@ function buildReading(deviceId, ts, i, total) {
   const accelY = round(noise(0.03), 3);
   const accelZ = round(9.81 + noise(0.05), 3);
 
-  // Audio RMS: atividade da colmeia, maior durante o dia.
-  const audioRms = round(0.03 + (wave + 1) / 2 * 0.04 + noise(0.005), 4);
+  // Audio RMS geral (dBFS): mais alto (proximo de 0) durante o dia.
+  const audioRms = round(-45 + (wave + 1) / 2 * 12 + noise(1.5), 1);
 
-  // Servo geralmente fechado; abre esporadicamente.
-  const servoStatus = Math.random() < 0.1 ? 'aberto' : 'fechado';
-  const fimCurso = servoStatus === 'fechado';
+  // Espectro de 20 faixas de 100 Hz (0-2 kHz) em dBFS. A energia das abelhas
+  // concentra-se em ~150-450 Hz; modela-se uma gaussiana + ruido, com o nivel
+  // subindo com a atividade diurna (wave). Mesmo formato de audio_bands do ESP.
+  const audioBands = [];
+  for (let b = 0; b < 20; b++) {
+    const centerHz = b * 100 + 50;
+    const shape = Math.exp(-Math.pow((centerHz - 300) / 250, 2)); // pico ~300 Hz
+    audioBands.push(round(-85 + shape * (35 + (wave + 1) * 8) + noise(3), 1));
+  }
 
   return {
     device_id: deviceId,
@@ -64,13 +70,11 @@ function buildReading(deviceId, ts, i, total) {
     temperatura_2: temp2,
     umidade_2: umid2,
     peso_raw: pesoRaw,
-    peso_kg: pesoKg,
     accel_x: accelX,
     accel_y: accelY,
     accel_z: accelZ,
     audio_rms: audioRms,
-    servo_status: servoStatus,
-    fim_curso: fimCurso,
+    audio_bands: audioBands,
   };
 }
 

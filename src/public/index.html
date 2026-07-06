@@ -48,13 +48,18 @@
       </article>
       <article class="card">
         <span class="card-label">Peso atual</span>
-        <span class="card-value" id="card-peso">&mdash;<span class="unit">kg</span></span>
+        <span class="card-value" id="card-peso">&mdash;<span class="unit">raw</span></span>
         <span class="card-sub" id="card-peso-sub">&mdash;</span>
       </article>
       <article class="card">
-        <span class="card-label">Servo</span>
-        <span class="card-value" id="card-servo">&mdash;</span>
-        <span class="card-sub" id="card-servo-sub">fim de curso</span>
+        <span class="card-label">Audio (RMS)</span>
+        <span class="card-value" id="card-audio">&mdash;<span class="unit">dBFS</span></span>
+        <span class="card-sub" id="card-audio-sub">nivel sonoro</span>
+      </article>
+      <article class="card">
+        <span class="card-label">Vibracao</span>
+        <span class="card-value" id="card-accel">&mdash;<span class="unit">m/s&sup2;</span></span>
+        <span class="card-sub" id="card-accel-sub">acelerometro</span>
       </article>
     </section>
 
@@ -69,12 +74,37 @@
         <div class="chart-box"><canvas id="chart-umid"></canvas></div>
       </div>
       <div class="chart-card">
-        <h2 class="chart-title">Peso (kg)</h2>
+        <h2 class="chart-title">Peso (bruto HX711)</h2>
         <div class="chart-box"><canvas id="chart-peso"></canvas></div>
       </div>
       <div class="chart-card">
-        <h2 class="chart-title">Audio RMS</h2>
+        <h2 class="chart-title">Audio RMS (dBFS)</h2>
         <div class="chart-box"><canvas id="chart-audio"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h2 class="chart-title">Aceleracao (m/s&sup2;)</h2>
+        <div class="chart-box"><canvas id="chart-accel"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h2 class="chart-title">Espectro de audio &mdash; ultima leitura (dBFS)</h2>
+        <div class="chart-box"><canvas id="chart-spectrum"></canvas></div>
+      </div>
+
+      <!-- Espectrograma: 20 faixas de 100 Hz (0-2 kHz) ao longo do tempo -->
+      <div class="chart-card chart-card--wide">
+        <h2 class="chart-title">Espectrograma de audio (0&ndash;2 kHz) &middot; media de 30 s por leitura</h2>
+        <div class="spectro-wrap">
+          <div class="spectro-yaxis"><span>2 kHz</span><span>1 kHz</span><span>0</span></div>
+          <div class="spectro-canvas-box"><canvas id="spectrogram"></canvas></div>
+        </div>
+        <div class="spectro-foot">
+          <span class="muted">&larr; mais antigo &middot; mais recente &rarr;</span>
+          <span class="spectro-legend">
+            <span class="muted">baixo</span>
+            <i class="spectro-grad"></i>
+            <span class="muted">alto</span>
+          </span>
+        </div>
       </div>
     </section>
 
@@ -92,14 +122,15 @@
               <th data-key="temperatura_2">T2</th>
               <th data-key="umidade_1">U1</th>
               <th data-key="umidade_2">U2</th>
-              <th data-key="peso_kg">Peso</th>
+              <th data-key="peso_raw">Peso (raw)</th>
+              <th data-key="accel_x">Ax</th>
+              <th data-key="accel_y">Ay</th>
+              <th data-key="accel_z">Az</th>
               <th data-key="audio_rms">Audio</th>
-              <th data-key="servo_status">Servo</th>
-              <th data-key="fim_curso">Fim curso</th>
             </tr>
           </thead>
           <tbody id="readings-body">
-            <tr><td colspan="11" class="empty">Carregando...</td></tr>
+            <tr><td colspan="12" class="empty">Carregando...</td></tr>
           </tbody>
         </table>
       </div>

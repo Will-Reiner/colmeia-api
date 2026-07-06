@@ -2,11 +2,17 @@
 
 API REST + dashboard web para um sistema de monitoramento de colmeia baseado em
 ESP32 (TCC de Engenharia Mecatronica). O ESP32 coleta leituras de multiplos
-sensores (temperatura, umidade, peso, acelerometro, audio, servo, fim de curso)
-e as envia periodicamente via HTTP POST. Este servico recebe e armazena esses
-dados em SQLite, expoe uma API REST para consulta/estatisticas e serve um
-dashboard dark mode (HTML/CSS/JS puro + Chart.js) com cards de status, graficos
-ao longo do tempo, tabela das ultimas leituras e atualizacao automatica.
+sensores — 2x DHT22 (temperatura/umidade), MPU-6050 (acelerometro), HX711
+(peso bruto), INMP441 (audio: RMS geral + espectro de 20 faixas de 100 Hz) — e
+as envia periodicamente via HTTP POST (telemetria a cada 15 s; clipes de audio
+em rajadas). Este servico recebe e armazena esses dados em SQLite, expoe uma API
+REST para consulta/estatisticas e serve um dashboard dark mode (HTML/CSS/JS puro
++ Chart.js) com cards de status, graficos ao longo do tempo, **espectrograma de
+audio**, tabela das ultimas leituras e atualizacao automatica.
+
+> Campos `servo_status`, `fim_curso` e `peso_kg` sao **legado**: o schema ainda
+> os aceita (opcionais), mas o firmware atual (`colmeia_esp.ino`) nao os envia.
+> O peso vai como `peso_raw` (contagens brutas do HX711, sem calibracao).
 
 ## Stack
 
@@ -60,6 +66,8 @@ Em producao/Coolify use `DB_PATH=/app/data/colmeia.db` (dentro do volume).
 
 ### Exemplo de payload
 
+Payload real do firmware atual (`colmeia_esp.ino`):
+
 ```json
 {
   "device_id": "colmeia_01",
@@ -68,19 +76,22 @@ Em producao/Coolify use `DB_PATH=/app/data/colmeia.db` (dentro do volume).
   "umidade_1": 65.2,
   "temperatura_2": 27.8,
   "umidade_2": 67.1,
-  "peso_raw": 245678,
-  "peso_kg": 12.34,
   "accel_x": 0.02,
   "accel_y": -0.01,
   "accel_z": 9.81,
-  "audio_rms": 0.045,
-  "servo_status": "fechado",
-  "fim_curso": true
+  "peso_raw": 245678,
+  "audio_rms": -38.4,
+  "audio_bands": [-80.1, -72.3, -55.2, -48.9, -52.1, -60.3, -66.0, -70.2, -74.1,
+                  -77.0, -80.2, -82.1, -84.0, -85.1, -86.0, -86.9, -87.5, -88.0,
+                  -88.4, -89.0]
 }
 ```
 
 Apenas `device_id` e `timestamp` sao obrigatorios — os demais campos sao
-opcionais (o ESP32 pode enviar leituras parciais).
+opcionais (o ESP32 pode enviar leituras parciais). `audio_rms` esta em **dBFS**
+(negativo; mais proximo de 0 = mais alto) e `audio_bands` traz 20 faixas de
+100 Hz (0–2 kHz) em dBFS, media de 30 s. Campos legado ainda aceitos:
+`peso_kg`, `servo_status`, `fim_curso`.
 
 ### Testar o POST com cURL
 
@@ -202,5 +213,13 @@ colmeia-api/
   preparada para adicionar API key (ver `.env.example` e `TODO` no codigo).
 - O servidor faz *graceful shutdown* em `SIGTERM`/`SIGINT`, fechando o banco.
 - O body parser aceita JSON de ate 10kb.
+- **Dashboard:** cards (temp, umidade, peso bruto, audio RMS, vibracao),
+  graficos ao longo do tempo, **espectro** (barras da ultima leitura) e
+  **espectrograma** (heatmap 0–2 kHz x tempo). O peso aparece bruto ate haver
+  calibracao — defina `PESO_CAL` em `src/public/app.js` para converter em kg.
+- **Firmware (`colmeia_esp.ino`):** telemetria (core 1) e audio (core 0) usam um
+  mutex (`netMutex`) para nao fazer handshakes TLS simultaneos — sem ele, o
+  `POST /api/sensor-data` falhava no proprio ESP (por falta de heap) enquanto uma
+  rajada de audio estava no ar, e a leitura nem chegava ao servidor.
 - `npm ci --omit=dev` no Dockerfile instala apenas dependencias de producao
   (equivalente moderno de `npm ci --production`).

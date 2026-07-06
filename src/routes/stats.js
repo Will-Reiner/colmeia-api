@@ -27,7 +27,10 @@ router.get('/stats', (req, res, next) => {
         u1: { min: round(raw.umid1_min), max: round(raw.umid1_max), avg: round(raw.umid1_avg) },
         u2: { min: round(raw.umid2_min), max: round(raw.umid2_max), avg: round(raw.umid2_avg) },
       },
+      // peso_kg fica para quando houver calibracao; hoje o ESP so envia peso_raw.
       peso_kg: { min: round(raw.peso_min), max: round(raw.peso_max), avg: round(raw.peso_avg) },
+      peso_raw: { min: round(raw.pesoraw_min), max: round(raw.pesoraw_max), avg: round(raw.pesoraw_avg) },
+      audio_rms: { min: round(raw.audio_min), max: round(raw.audio_max), avg: round(raw.audio_avg) },
     });
   } catch (err) {
     return next(err);

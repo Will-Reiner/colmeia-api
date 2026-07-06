@@ -195,7 +195,9 @@ function stats24h(opts = {}) {
       MIN(temperatura_2) AS temp2_min, MAX(temperatura_2) AS temp2_max, AVG(temperatura_2) AS temp2_avg,
       MIN(umidade_1)     AS umid1_min, MAX(umidade_1)     AS umid1_max, AVG(umidade_1)     AS umid1_avg,
       MIN(umidade_2)     AS umid2_min, MAX(umidade_2)     AS umid2_max, AVG(umidade_2)     AS umid2_avg,
-      MIN(peso_kg)       AS peso_min,  MAX(peso_kg)       AS peso_max,  AVG(peso_kg)       AS peso_avg
+      MIN(peso_kg)       AS peso_min,  MAX(peso_kg)       AS peso_max,  AVG(peso_kg)       AS peso_avg,
+      MIN(peso_raw)      AS pesoraw_min, MAX(peso_raw)    AS pesoraw_max, AVG(peso_raw)     AS pesoraw_avg,
+      MIN(audio_rms)     AS audio_min, MAX(audio_rms)     AS audio_max, AVG(audio_rms)     AS audio_avg
     FROM sensor_readings
     WHERE timestamp >= @since ${deviceClause}
   `;
