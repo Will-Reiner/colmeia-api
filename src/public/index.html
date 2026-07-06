@@ -9,7 +9,6 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/style.css" />
-  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
 </head>
 <body>
   <div class="ambient ambient-a"></div>
@@ -20,201 +19,182 @@
       <div class="brand">
         <span class="eyebrow">Colmeia 4.0</span>
         <h1>Observabilidade da colmeia</h1>
-        <!DOCTYPE html>
-        <html lang="pt-BR">
-        <head>
-          <meta charset="UTF-8" />
-          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-          <meta name="theme-color" content="#0b1020" />
-          <title>Colmeia 4.0 | Observabilidade</title>
-          <link rel="preconnect" href="https://fonts.googleapis.com" />
-          <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-          <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
-          <link rel="stylesheet" href="/style.css" />
-        </head>
-        <body>
-          <div class="ambient ambient-a"></div>
-          <div class="ambient ambient-b"></div>
+        <span class="subtitle">Sensores, audio, aceleracao e espectro em uma interface unica.</span>
+      </div>
+      <div class="controls">
+        <label for="device-select" class="control-label">Dispositivo</label>
+        <select id="device-select" class="select">
+          <option value="">Todos</option>
+        </select>
 
-          <header class="topbar">
-            <div class="topbar-inner">
-              <div class="brand">
-                <span class="eyebrow">Colmeia 4.0</span>
-                <h1>Observabilidade da colmeia</h1>
-                <span class="subtitle">Sensores, audio, aceleração e espectro em uma interface unica.</span>
-              </div>
-              <div class="controls">
-                <label for="device-select" class="control-label">Dispositivo</label>
-                <select id="device-select" class="select">
-                  <option value="">Todos</option>
-                </select>
+        <label for="range-select" class="control-label">Periodo</label>
+        <select id="range-select" class="select">
+          <option value="1">1h</option>
+          <option value="6">6h</option>
+          <option value="24" selected>24h</option>
+          <option value="168">7d</option>
+        </select>
 
-                <label for="range-select" class="control-label">Periodo</label>
-                <select id="range-select" class="select">
-                  <option value="1">1h</option>
-                  <option value="6">6h</option>
-                  <option value="24" selected>24h</option>
-                  <option value="168">7d</option>
-                </select>
+        <span id="last-update" class="last-update" title="Ultima atualizacao">&mdash;</span>
+      </div>
+    </div>
+  </header>
 
-                <span id="last-update" class="last-update" title="Ultima atualizacao">&mdash;</span>
-              </div>
-            </div>
-          </header>
+  <main class="container">
+    <section class="hero" aria-label="Resumo do sistema">
+      <div class="hero-copy">
+        <span class="hero-kicker">Audio, sensores e telemetria</span>
+        <h2>Uma leitura viva da colmeia, do campo ao espectro.</h2>
+        <p>
+          Veja temperatura, umidade, peso bruto, RMS de audio, aceleracao, espectro e
+          ouca os clipes WAV capturados pelo ESP32 sem sair da pagina.
+        </p>
+        <div class="hero-chips">
+          <span class="hero-chip">ESP32 dual-core</span>
+          <span class="hero-chip">20 bandas de 100 Hz</span>
+          <span class="hero-chip">Espectrograma</span>
+          <span class="hero-chip">Playback WAV</span>
+          <span class="hero-chip hero-chip-accent" id="hero-device-chip">Todos os devices</span>
+        </div>
+      </div>
 
-          <main class="container">
-            <section class="hero" aria-label="Resumo do sistema">
-              <div class="hero-copy">
-                <span class="hero-kicker">Audio, sensores e telemetria</span>
-                <h2>Uma leitura viva da colmeia, do campo ao espectro.</h2>
-                <p>
-                  Veja temperatura, umidade, peso bruto, RMS de audio, aceleração, espectro e
-                  ouça os clipes WAV capturados pelo ESP32 sem sair da pagina.
-                </p>
-                <div class="hero-chips">
-                  <span class="hero-chip">ESP32 dual-core</span>
-                  <span class="hero-chip">20 bandas de 100 Hz</span>
-                  <span class="hero-chip">Espectrograma</span>
-                  <span class="hero-chip">Playback WAV</span>
-                  <span class="hero-chip hero-chip-accent" id="hero-device-chip">Todos os devices</span>
-                </div>
-              </div>
+      <div class="hero-panel">
+        <div class="hero-panel-item">
+          <span class="panel-label">Ultima leitura</span>
+          <strong id="dashboard-last-reading">&mdash;</strong>
+        </div>
+        <div class="hero-panel-item">
+          <span class="panel-label">Sessoes de audio</span>
+          <strong id="dashboard-audio-count">0</strong>
+        </div>
+        <div class="hero-panel-item">
+          <span class="panel-label">Janela ativa</span>
+          <strong id="dashboard-window">24h</strong>
+        </div>
+      </div>
+    </section>
 
-              <div class="hero-panel">
-                <div class="hero-panel-item">
-                  <span class="panel-label">Ultima leitura</span>
-                  <strong id="dashboard-last-reading">&mdash;</strong>
-                </div>
-                <div class="hero-panel-item">
-                  <span class="panel-label">Sessoes de audio</span>
-                  <strong id="dashboard-audio-count">0</strong>
-                </div>
-                <div class="hero-panel-item">
-                  <span class="panel-label">Janela ativa</span>
-                  <strong id="dashboard-window">24h</strong>
-                </div>
-              </div>
-            </section>
+    <section class="cards" aria-label="Status atual">
+      <article class="card">
+        <span class="card-label">Temperatura media</span>
+        <span class="card-value" id="card-temp">&mdash;<span class="unit">&deg;C</span></span>
+        <span class="card-sub" id="card-temp-sub">t1 / t2</span>
+      </article>
+      <article class="card">
+        <span class="card-label">Umidade media</span>
+        <span class="card-value" id="card-umid">&mdash;<span class="unit">%</span></span>
+        <span class="card-sub" id="card-umid-sub">u1 / u2</span>
+      </article>
+      <article class="card">
+        <span class="card-label">Peso bruto</span>
+        <span class="card-value" id="card-peso">&mdash;<span class="unit">raw</span></span>
+        <span class="card-sub" id="card-peso-sub">HX711</span>
+      </article>
+      <article class="card">
+        <span class="card-label">Audio RMS</span>
+        <span class="card-value" id="card-audio">&mdash;<span class="unit">dBFS</span></span>
+        <span class="card-sub" id="card-audio-sub">nivel sonoro</span>
+      </article>
+      <article class="card">
+        <span class="card-label">Aceleracao</span>
+        <span class="card-value" id="card-accel">&mdash;<span class="unit">m/s&sup2;</span></span>
+        <span class="card-sub" id="card-accel-sub">MPU-6050</span>
+      </article>
+    </section>
 
-            <section class="cards" aria-label="Status atual">
-              <article class="card">
-                <span class="card-label">Temperatura media</span>
-                <span class="card-value" id="card-temp">&mdash;<span class="unit">&deg;C</span></span>
-                <span class="card-sub" id="card-temp-sub">t1 / t2</span>
-              </article>
-              <article class="card">
-                <span class="card-label">Umidade media</span>
-                <span class="card-value" id="card-umid">&mdash;<span class="unit">%</span></span>
-                <span class="card-sub" id="card-umid-sub">u1 / u2</span>
-              </article>
-              <article class="card">
-                <span class="card-label">Peso bruto</span>
-                <span class="card-value" id="card-peso">&mdash;<span class="unit">raw</span></span>
-                <span class="card-sub" id="card-peso-sub">HX711</span>
-              </article>
-              <article class="card">
-                <span class="card-label">Audio RMS</span>
-                <span class="card-value" id="card-audio">&mdash;<span class="unit">dBFS</span></span>
-                <span class="card-sub" id="card-audio-sub">nivel sonoro</span>
-              </article>
-              <article class="card">
-                <span class="card-label">Aceleração</span>
-                <span class="card-value" id="card-accel">&mdash;<span class="unit">m/s&sup2;</span></span>
-                <span class="card-sub" id="card-accel-sub">MPU-6050</span>
-              </article>
-            </section>
+    <section class="charts" aria-label="Graficos">
+      <div class="chart-card">
+        <h2 class="chart-title">Temperatura (&deg;C)</h2>
+        <div class="chart-box"><canvas id="chart-temp"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h2 class="chart-title">Umidade (%)</h2>
+        <div class="chart-box"><canvas id="chart-umid"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h2 class="chart-title">Peso bruto (HX711)</h2>
+        <div class="chart-box"><canvas id="chart-peso"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h2 class="chart-title">Audio RMS (dBFS)</h2>
+        <div class="chart-box"><canvas id="chart-audio"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h2 class="chart-title">Aceleracao (m/s&sup2;)</h2>
+        <div class="chart-box"><canvas id="chart-accel"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h2 class="chart-title">Espectro de audio</h2>
+        <div class="chart-box"><canvas id="chart-spectrum"></canvas></div>
+      </div>
+      <div class="chart-card chart-card-wide">
+        <div class="section-head-inline">
+          <div>
+            <h2 class="chart-title">Espectrograma de audio</h2>
+            <span class="spectro-note">Cada coluna representa uma leitura. Cores mais quentes indicam maior energia; a faixa mais baixa fica embaixo.</span>
+          </div>
+          <span class="chart-meta">0–2 kHz | media de 30 s por leitura</span>
+        </div>
+        <div class="spectro-wrap">
+          <div class="spectro-yaxis"><span>2 kHz</span><span>1 kHz</span><span>0</span></div>
+          <div class="spectro-canvas-box"><canvas id="spectrogram"></canvas></div>
+        </div>
+        <div class="spectro-foot">
+          <span class="muted">&larr; mais antigo &middot; mais recente &rarr;</span>
+          <span class="spectro-legend">
+            <span class="muted">baixo</span>
+            <i class="spectro-grad"></i>
+            <span class="muted">alto</span>
+          </span>
+        </div>
+      </div>
+    </section>
 
-            <section class="charts" aria-label="Graficos">
-              <div class="chart-card">
-                <h2 class="chart-title">Temperatura (&deg;C)</h2>
-                <div class="chart-box"><canvas id="chart-temp"></canvas></div>
-              </div>
-              <div class="chart-card">
-                <h2 class="chart-title">Umidade (%)</h2>
-                <div class="chart-box"><canvas id="chart-umid"></canvas></div>
-              </div>
-              <div class="chart-card">
-                <h2 class="chart-title">Peso bruto (HX711)</h2>
-                <div class="chart-box"><canvas id="chart-peso"></canvas></div>
-              </div>
-              <div class="chart-card">
-                <h2 class="chart-title">Audio RMS (dBFS)</h2>
-                <div class="chart-box"><canvas id="chart-audio"></canvas></div>
-              </div>
-              <div class="chart-card">
-                <h2 class="chart-title">Aceleração (m/s&sup2;)</h2>
-                <div class="chart-box"><canvas id="chart-accel"></canvas></div>
-              </div>
-              <div class="chart-card">
-                <h2 class="chart-title">Espectro de audio</h2>
-                <div class="chart-box"><canvas id="chart-spectrum"></canvas></div>
-              </div>
-              <div class="chart-card chart-card-wide">
-                <div class="section-head-inline">
-                  <h2 class="chart-title">Espectrograma de audio (0–2 kHz)</h2>
-                  <span class="chart-meta">media de 30 s por leitura</span>
-                </div>
-                <div class="spectro-wrap">
-                  <div class="spectro-yaxis"><span>2 kHz</span><span>1 kHz</span><span>0</span></div>
-                  <div class="spectro-canvas-box"><canvas id="spectrogram"></canvas></div>
-                </div>
-                <div class="spectro-foot">
-                  <span class="muted">&larr; mais antigo &middot; mais recente &rarr;</span>
-                  <span class="spectro-legend">
-                    <span class="muted">baixo</span>
-                    <i class="spectro-grad"></i>
-                    <span class="muted">alto</span>
-                  </span>
-                </div>
-              </div>
-            </section>
+    <section class="audio-section" aria-label="Audios capturados">
+      <div class="section-head-inline">
+        <h2 class="section-title section-title-large">Audios capturados</h2>
+        <span class="chart-meta"><span id="audio-count">0</span> arquivos recentes</span>
+      </div>
+      <div id="audio-library" class="audio-grid">
+        <div class="empty audio-empty">Nenhum WAV capturado ainda.</div>
+      </div>
+    </section>
 
-            <section class="audio-section" aria-label="Audios capturados">
-              <div class="section-head-inline">
-                <h2 class="section-title section-title-large">Audios capturados</h2>
-                <span class="chart-meta"><span id="audio-count">0</span> arquivos recentes</span>
-              </div>
-              <div id="audio-library" class="audio-grid">
-                <div class="empty audio-empty">Nenhum WAV capturado ainda.</div>
-              </div>
-            </section>
+    <section class="table-section" aria-label="Ultimas leituras">
+      <h2 class="section-title">Ultimas leituras</h2>
+      <div class="table-wrap">
+        <table id="readings-table">
+          <thead>
+            <tr>
+              <th data-key="received_at">Recebido</th>
+              <th data-key="device_id">Device</th>
+              <th data-key="timestamp">Timestamp</th>
+              <th data-key="temperatura_1">T1</th>
+              <th data-key="temperatura_2">T2</th>
+              <th data-key="umidade_1">U1</th>
+              <th data-key="umidade_2">U2</th>
+              <th data-key="peso_raw">Peso raw</th>
+              <th data-key="accel_x">Ax</th>
+              <th data-key="accel_y">Ay</th>
+              <th data-key="accel_z">Az</th>
+              <th data-key="audio_rms">Audio</th>
+              <th data-key="band_peak">Banda dominante</th>
+              <th data-key="band_count">Bandas</th>
+            </tr>
+          </thead>
+          <tbody id="readings-body">
+            <tr><td colspan="14" class="empty">Carregando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
 
-            <section class="table-section" aria-label="Ultimas leituras">
-              <h2 class="section-title">Ultimas leituras</h2>
-              <div class="table-wrap">
-                <table id="readings-table">
-                  <thead>
-                    <tr>
-                      <th data-key="received_at">Recebido</th>
-                      <th data-key="device_id">Device</th>
-                      <th data-key="timestamp">Timestamp</th>
-                      <th data-key="temperatura_1">T1</th>
-                      <th data-key="temperatura_2">T2</th>
-                      <th data-key="umidade_1">U1</th>
-                      <th data-key="umidade_2">U2</th>
-                      <th data-key="peso_raw">Peso raw</th>
-                      <th data-key="accel_x">Ax</th>
-                      <th data-key="accel_y">Ay</th>
-                      <th data-key="accel_z">Az</th>
-                      <th data-key="audio_rms">Audio</th>
-                      <th data-key="band_peak">Banda dominante</th>
-                      <th data-key="band_count">Bandas</th>
-                    </tr>
-                  </thead>
-                  <tbody id="readings-body">
-                    <tr><td colspan="14" class="empty">Carregando...</td></tr>
-                  </tbody>
-                </table>
-              </div>
-            </section>
-          </main>
+  <footer class="footer">
+    <span>Atualizacao automatica a cada 30s | audio, espectro e dados de sensores sincronizados</span>
+  </footer>
 
-          <footer class="footer">
-            <span>Atualizacao automatica a cada 30s | audio, espectro e dados de sensores sincronizados</span>
-          </footer>
-
-          <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-          <script src="/app.js"></script>
-        </body>
-        </html>
-
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>

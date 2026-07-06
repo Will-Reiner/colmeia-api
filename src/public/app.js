@@ -1,26 +1,8 @@
 'use strict';
 
 /**
- * Dashboard da colmeia: mostra temperatura, umidade, peso, audio RMS,
- * espectro de 20 bandas e uma biblioteca de clipes WAV capturados pelo ESP32.
- */
-
-const REFRESH_MS = 30000;
-const RANGE_HOURS_DEFAULT = 24;
-const MAX_AUDIO_FILES = 12;
-
-// Espectro de audio: o ESP envia 20 faixas de 100 Hz (0-2 kHz) em audio_bands.
-const NUM_BANDS = 20;
-const BAND_HZ_STEP = 100;
-
-// Calibracao do peso. O firmware envia apenas peso_raw (contagens brutas do
-// HX711 — faz tare() mas nao set_scale()). Enquanto `factor` for null, o
-// dashboard mostra o valor bruto. Para exibir em kg quando voce calibrar:
-'use strict';
-
-/**
- * Dashboard da colmeia: mostra temperatura, umidade, peso bruto, audio RMS,
- * aceleracao, espectro, espectrograma e uma biblioteca de clipes WAV.
+ * Dashboard da colmeia: temperatura, umidade, peso bruto, audio RMS,
+ * aceleracao, espectro de 20 bandas, espectrograma e biblioteca de WAV.
  */
 
 const REFRESH_MS = 30000;
@@ -29,21 +11,18 @@ const MAX_AUDIO_FILES = 12;
 const NUM_BANDS = 20;
 const BAND_HZ_STEP = 100;
 const BAND_MAX_HZ = 2000;
-const PESO_CAL = { factor: null, offset: 0 };
 
 const state = {
   deviceId: '',
   rangeHours: RANGE_HOURS_DEFAULT,
   sort: { key: 'received_at', dir: 'desc' },
-  lastReadings: [],
-  lastSeries: [],
   latestReadings: [],
+  lastSeries: [],
+  lastReadings: [],
   audioFiles: [],
-  lastFetch: null,
 };
 
 const charts = {};
-
 const COLORS = {
   t1: '#ff8a5b',
   t2: '#ffb86b',
@@ -57,7 +36,18 @@ const COLORS = {
   spectrum: '#c084fc',
 };
 
-document.addEventListener('DOMContentLoaded', () => {
+const DB_STOPS = [
+  [13, 17, 22],
+  [30, 60, 140],
+  [30, 150, 180],
+  [40, 180, 90],
+  [230, 200, 40],
+  [240, 90, 60],
+];
+
+const PESO_CAL = { factor: null, offset: 0 };
+
+window.addEventListener('DOMContentLoaded', () => {
   setupControls();
   setupSorting();
   initCharts();
@@ -67,7 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let resizeTimer = null;
   window.addEventListener('resize', () => {
     clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => renderSpectrogram(state.lastSeries), 150);
+    resizeTimer = setTimeout(() => renderSpectrogram(state.lastSeries), 120);
   });
 });
 
@@ -75,13 +65,13 @@ function setupControls() {
   const deviceSelect = document.getElementById('device-select');
   const rangeSelect = document.getElementById('range-select');
 
-  deviceSelect.addEventListener('change', (e) => {
-    state.deviceId = e.target.value;
+  deviceSelect.addEventListener('change', (event) => {
+    state.deviceId = event.target.value;
     refresh();
   });
 
-  rangeSelect.addEventListener('change', (e) => {
-    state.rangeHours = Number(e.target.value);
+  rangeSelect.addEventListener('change', (event) => {
+    state.rangeHours = Number(event.target.value) || RANGE_HOURS_DEFAULT;
     refresh();
   });
 }
@@ -106,7 +96,7 @@ async function refresh() {
     const since = nowUnix() - state.rangeHours * 3600;
     const deviceQuery = state.deviceId ? `&device_id=${encodeURIComponent(state.deviceId)}` : '';
 
-    const [statsRes, latestRes, seriesRes, tableRes, devicesRes, audioFiles] = await Promise.all([
+    const [statsRes, latestRes, seriesRes, tableRes, devicesRes, audioRes] = await Promise.all([
       fetchJson(`/api/stats?hours=${state.rangeHours}${deviceQuery}`),
       fetchJson('/api/sensor-data/latest'),
       fetchJson(`/api/sensor-data?limit=1000&since=${since}${deviceQuery}`),
@@ -118,19 +108,17 @@ async function refresh() {
     state.latestReadings = latestRes.data || [];
     state.lastSeries = (seriesRes.data || []).slice().reverse();
     state.lastReadings = tableRes.data || [];
-    state.audioFiles = Array.isArray(audioFiles) ? audioFiles : [];
+    state.audioFiles = Array.isArray(audioRes) ? audioRes : [];
 
     updateDeviceOptions(devicesRes.data || []);
     renderOverview(selectReferenceReading(state.latestReadings), statsRes);
-    renderCharts(state.lastSeries, selectReferenceReading(state.latestReadings));
+    renderCharts(state.lastSeries);
     renderTable(state.lastReadings);
     renderAudioLibrary(state.audioFiles);
     updateDashboardMeta();
-
-    state.lastFetch = Date.now();
     updateLastUpdate();
-  } catch (err) {
-    console.error('Falha ao atualizar dashboard:', err);
+  } catch (error) {
+    console.error('Falha ao atualizar dashboard:', error);
     setLastUpdateError();
   }
 }
@@ -144,7 +132,7 @@ async function fetchJson(url) {
 function selectReferenceReading(readings) {
   if (!readings || !readings.length) return null;
   if (state.deviceId) {
-    return readings.find((r) => r.device_id === state.deviceId) || null;
+    return readings.find((reading) => reading.device_id === state.deviceId) || null;
   }
   return readings.slice().sort((a, b) => b.timestamp - a.timestamp)[0] || null;
 }
@@ -184,30 +172,30 @@ function renderOverview(reading, stats) {
     return;
   }
 
-  const tAvg = avg([reading.temperatura_1, reading.temperatura_2]);
-  const uAvg = avg([reading.umidade_1, reading.umidade_2]);
+  const tempAvg = avg([reading.temperatura_1, reading.temperatura_2]);
+  const umidAvg = avg([reading.umidade_1, reading.umidade_2]);
+  const peso = pesoInfo(reading.peso_raw);
+  const accel = accelMag(reading);
 
-  tempEl.innerHTML = `${fmt(tAvg, 1)}<span class="unit">&deg;C</span>`;
+  tempEl.innerHTML = `${fmt(tempAvg, 1)}<span class="unit">&deg;C</span>`;
   tempSub.textContent = `T1 ${fmt(reading.temperatura_1, 1)} / T2 ${fmt(reading.temperatura_2, 1)}`;
 
-  umidEl.innerHTML = `${fmt(uAvg, 1)}<span class="unit">%</span>`;
+  umidEl.innerHTML = `${fmt(umidAvg, 1)}<span class="unit">%</span>`;
   umidSub.textContent = `U1 ${fmt(reading.umidade_1, 1)} / U2 ${fmt(reading.umidade_2, 1)}`;
 
-  const p = pesoInfo(reading.peso_raw);
-  pesoEl.innerHTML = `${fmt(p.value, p.decimals)}<span class="unit">${p.unit}</span>`;
+  pesoEl.innerHTML = `${fmt(peso.value, peso.decimals)}<span class="unit">${peso.unit}</span>`;
   pesoSub.textContent = stats && stats.peso_raw && stats.peso_raw.min != null
     ? `min ${fmt(stats.peso_raw.min, 0)} / max ${fmt(stats.peso_raw.max, 0)} (24h)`
-    : reading.device_id;
+    : 'HX711';
 
   audioEl.innerHTML = `${fmt(reading.audio_rms, 1)}<span class="unit">dBFS</span>`;
   audioSub.textContent = stats && stats.audio_rms && stats.audio_rms.avg != null
     ? `media ${fmt(stats.audio_rms.avg, 1)} dBFS (24h)`
     : 'nivel sonoro';
 
-  const mag = accelMag(reading);
-  accelEl.innerHTML = `${fmt(mag, 2)}<span class="unit">m/s&sup2;</span>`;
+  accelEl.innerHTML = `${fmt(accel, 2)}<span class="unit">m/s&sup2;</span>`;
   accelSub.textContent = reading.accel_x != null
-    ? `x ${fmt(reading.accel_x, 2)} · y ${fmt(reading.accel_y, 2)} · z ${fmt(reading.accel_z, 2)}`
+    ? `x ${fmt(reading.accel_x, 2)} • y ${fmt(reading.accel_y, 2)} • z ${fmt(reading.accel_z, 2)}`
     : 'acelerometro';
 }
 
@@ -223,7 +211,7 @@ function initCharts() {
   ]);
 
   charts.peso = makeLineChart('chart-peso', [
-    { key: 'peso_raw', label: 'Peso (bruto)', color: COLORS.peso },
+    { key: 'peso_raw', label: 'Peso bruto', color: COLORS.peso },
   ]);
 
   charts.audio = makeLineChart('chart-audio', [
@@ -245,17 +233,17 @@ function makeLineChart(canvasId, series) {
     type: 'line',
     data: {
       labels: [],
-      datasets: series.map((s) => ({
-        label: s.label,
+      datasets: series.map((serie) => ({
+        label: serie.label,
         data: [],
-        borderColor: s.color,
-        backgroundColor: s.color + '22',
+        borderColor: serie.color,
+        backgroundColor: serie.color + '22',
         borderWidth: 2,
         pointRadius: 0,
         pointHoverRadius: 4,
         tension: 0.28,
         spanGaps: true,
-        _key: s.key,
+        _key: serie.key,
       })),
     },
     options: {
@@ -294,7 +282,7 @@ function makeSpectrumChart(canvasId) {
   return new Chart(ctx, {
     type: 'bar',
     data: {
-      labels: Array.from({ length: NUM_BANDS }, (_, i) => bandLabelShort(i)),
+      labels: Array.from({ length: NUM_BANDS }, (_, index) => bandLabelShort(index)),
       datasets: [{
         label: 'dBFS',
         data: [],
@@ -333,82 +321,86 @@ function makeSpectrumChart(canvasId) {
   });
 }
 
-function renderCharts(readings, reading) {
-  const labels = readings.map((r) => formatClock(r.timestamp));
-  for (const chart of [charts.temp, charts.umid, charts.peso, charts.audio, charts.accel]) {
+function renderCharts(readings) {
+  const labels = readings.map((reading) => formatClock(reading.timestamp));
+
+  [charts.temp, charts.umid, charts.peso, charts.audio, charts.accel].forEach((chart) => {
     chart.data.labels = labels;
-    chart.data.datasets.forEach((ds) => {
-      ds.data = readings.map((r) => (r[ds._key] != null ? r[ds._key] : null));
+    chart.data.datasets.forEach((dataset) => {
+      dataset.data = readings.map((reading) => (reading[dataset._key] != null ? reading[dataset._key] : null));
     });
     chart.update('none');
-  }
+  });
 
   renderSpectrumBar(readings);
   renderSpectrogram(readings);
 }
 
-function bandsOf(reading) {
-  const b = reading && reading.audio_bands;
-  return Array.isArray(b) && b.length === NUM_BANDS ? b : null;
-}
-
 function renderSpectrumBar(readings) {
-  let latest = null;
-  for (let i = readings.length - 1; i >= 0; i--) {
-    const b = bandsOf(readings[i]);
-    if (b) { latest = b; break; }
+  let latestBands = null;
+  for (let index = readings.length - 1; index >= 0; index--) {
+    const bands = bandsOf(readings[index]);
+    if (bands) {
+      latestBands = bands;
+      break;
+    }
   }
-  if (charts.spectrum) {
-    charts.spectrum.data.datasets[0].data = latest || [];
-    charts.spectrum.update('none');
-  }
+
+  charts.spectrum.data.datasets[0].data = latestBands || [];
+  charts.spectrum.update('none');
 }
 
 function renderSpectrogram(readings) {
   const canvas = document.getElementById('spectrogram');
   if (!canvas) return;
+
   const box = canvas.parentElement;
+  const cssWidth = Math.max(box.clientWidth, 1);
+  const cssHeight = Math.max(box.clientHeight, 1);
   const dpr = window.devicePixelRatio || 1;
-  const cssW = Math.max(box.clientWidth, 1);
-  const cssH = Math.max(box.clientHeight, 1);
-  canvas.width = Math.round(cssW * dpr);
-  canvas.height = Math.round(cssH * dpr);
+
+  canvas.width = Math.round(cssWidth * dpr);
+  canvas.height = Math.round(cssHeight * dpr);
+
   const ctx = canvas.getContext('2d');
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.clearRect(0, 0, cssW, cssH);
+  ctx.clearRect(0, 0, cssWidth, cssHeight);
 
-  const cols = readings.map(bandsOf).filter(Boolean);
-  if (!cols.length) {
+  const columns = readings.map(bandsOf).filter(Boolean);
+  if (!columns.length) {
     ctx.fillStyle = '#6b7484';
     ctx.font = '12px -apple-system, "Segoe UI", sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('Sem espectro no periodo (audio_bands vazio).', cssW / 2, cssH / 2);
+    ctx.fillText('Sem audio_bands no periodo.', cssWidth / 2, cssHeight / 2);
     return;
   }
 
   let lo = Infinity;
   let hi = -Infinity;
-  for (const col of cols) {
-    for (const v of col) {
-      if (v == null || v <= -119.9) continue;
-      if (v < lo) lo = v;
-      if (v > hi) hi = v;
-    }
-  }
-  if (!isFinite(lo) || !isFinite(hi) || hi - lo < 1) { lo = -90; hi = -20; }
+  columns.forEach((bands) => {
+    bands.forEach((value) => {
+      if (value == null || value <= -119.9) return;
+      lo = Math.min(lo, value);
+      hi = Math.max(hi, value);
+    });
+  });
 
-  const colW = cssW / cols.length;
-  const rowH = cssH / NUM_BANDS;
-  for (let c = 0; c < cols.length; c++) {
-    const col = cols[c];
-    for (let b = 0; b < NUM_BANDS; b++) {
-      const v = col[b];
-      const t = (v == null || v <= -119.9) ? 0 : clamp01((v - lo) / (hi - lo));
-      ctx.fillStyle = dbColor(t);
-      const y = cssH - (b + 1) * rowH;
-      ctx.fillRect(c * colW, y, Math.ceil(colW) + 0.5, Math.ceil(rowH) + 0.5);
-    }
+  if (!isFinite(lo) || !isFinite(hi) || hi - lo < 1) {
+    lo = -90;
+    hi = -20;
   }
+
+  const colWidth = cssWidth / columns.length;
+  const rowHeight = cssHeight / NUM_BANDS;
+
+  columns.forEach((bands, columnIndex) => {
+    bands.forEach((value, bandIndex) => {
+      const normalized = value == null || value <= -119.9 ? 0 : clamp01((value - lo) / (hi - lo));
+      ctx.fillStyle = dbColor(normalized);
+      const y = cssHeight - (bandIndex + 1) * rowHeight;
+      ctx.fillRect(columnIndex * colWidth, y, Math.ceil(colWidth) + 0.5, Math.ceil(rowHeight) + 0.5);
+    });
+  });
 }
 
 function renderTable(readings) {
@@ -436,7 +428,7 @@ function renderTable(readings) {
     }
     return dir === 'asc'
       ? String(av).localeCompare(String(bv))
-      : String(bv).localeCompare(String(av));
+      : String(String(bv)).localeCompare(String(av));
   });
 
   document.querySelectorAll('#readings-table thead th[data-key]').forEach((th) => {
@@ -483,10 +475,11 @@ function renderAudioLibrary(files) {
 
   grid.innerHTML = files.map((file) => {
     const url = audioFileUrl(file.file);
+    const tagClass = file.trigger === 'anomaly' ? 'audio-tag-alert' : 'audio-tag-soft';
     return `
       <article class="audio-card">
         <div class="audio-card-head">
-          <span class="audio-tag ${file.trigger === 'anomaly' ? 'audio-tag-alert' : 'audio-tag-soft'}">${escapeHtml(file.trigger)}</span>
+          <span class="audio-tag ${tagClass}">${escapeHtml(file.trigger || 'periodic')}</span>
           <span class="audio-meta">${escapeHtml(file.quando || '—')}</span>
         </div>
         <h3>${escapeHtml(file.file)}</h3>
@@ -501,13 +494,18 @@ function renderAudioLibrary(files) {
 function updateDeviceOptions(devices) {
   const select = document.getElementById('device-select');
   if (!select) return;
+
   select.innerHTML = '<option value="">Todos</option>';
-  devices.forEach((device) => {
-    const option = document.createElement('option');
-    option.value = device.device_id;
-    option.textContent = `${device.device_id} (${device.reading_count})`;
-    select.appendChild(option);
-  });
+  devices
+    .slice()
+    .sort((a, b) => String(a.device_id).localeCompare(String(b.device_id)))
+    .forEach((device) => {
+      const option = document.createElement('option');
+      option.value = device.device_id;
+      option.textContent = `${device.device_id} (${device.reading_count})`;
+      select.appendChild(option);
+    });
+
   select.value = state.deviceId;
 }
 
@@ -517,25 +515,20 @@ function updateDashboardMeta() {
 }
 
 function updateLastUpdate() {
-  const el = document.getElementById('last-update');
-  if (!el) return;
-  if (!state.lastFetch) {
-    el.textContent = '—';
-    return;
+  const label = document.getElementById('last-update');
+  if (label) {
+    label.textContent = 'Atualizado agora';
   }
-  el.classList.remove('stale');
-  el.textContent = `Atualizado ${relativeTime(state.lastFetch)}`;
 }
 
 function setLastUpdateError() {
-  const el = document.getElementById('last-update');
-  if (!el) return;
-  el.classList.add('stale');
-  el.textContent = 'Falha ao atualizar';
+  const label = document.getElementById('last-update');
+  if (label) label.textContent = 'Falha ao atualizar';
 }
 
 function summarizeBands(bands) {
   if (!Array.isArray(bands) || !bands.length) return null;
+
   let peakIndex = 0;
   let peakValue = Number.NEGATIVE_INFINITY;
   let sum = 0;
@@ -560,6 +553,11 @@ function summarizeBands(bands) {
     peakLabel: bandLabel(peakIndex),
     average: sum / valid,
   };
+}
+
+function bandsOf(reading) {
+  const bands = reading && reading.audio_bands;
+  return Array.isArray(bands) && bands.length === NUM_BANDS ? bands : null;
 }
 
 function bandLabel(index) {
@@ -628,15 +626,6 @@ function clamp01(value) {
   return value;
 }
 
-const DB_STOPS = [
-  [13, 17, 22],
-  [30, 60, 140],
-  [30, 150, 180],
-  [40, 180, 90],
-  [230, 200, 40],
-  [240, 90, 60],
-];
-
 function dbColor(t) {
   t = clamp01(t);
   const n = DB_STOPS.length - 1;
@@ -659,21 +648,8 @@ function formatDateTime(unix) {
   if (unix == null) return '—';
   const date = new Date(unix * 1000);
   return date.toLocaleString('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
+    day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
   });
-}
-
-function relativeTime(ms) {
-  const secs = Math.floor((Date.now() - ms) / 1000);
-  if (secs < 5) return 'agora';
-  if (secs < 60) return `ha ${secs}s`;
-  const mins = Math.floor(secs / 60);
-  if (mins < 60) return `ha ${mins} min`;
-  const hours = Math.floor(mins / 60);
-  return `ha ${hours}h`;
 }
 
 function escapeHtml(value) {
@@ -685,4 +661,3 @@ function escapeHtml(value) {
     "'": '&#39;',
   }[char]));
 }
-    return;
