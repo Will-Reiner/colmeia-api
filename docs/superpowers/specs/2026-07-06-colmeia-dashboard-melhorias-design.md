@@ -64,8 +64,9 @@ Mudanças (frontend apenas):
 - `pesoInfo(reading)` passa a ler `peso_kg` com **2 casas decimais**, unidade
   `kg`. Fallback: leituras antigas só têm `peso_raw` (kg inteiro) —
   `const kg = reading.peso_kg != null ? reading.peso_kg : reading.peso_raw`.
-- Card Peso: unidade → `kg`; sub usa `stats.peso_kg` (com fallback
-  `stats.peso_raw`) para min/max.
+- Card Peso: unidade → `kg`; sub usa `stats.peso_kg` para min/max. No `db.js`,
+  as estatisticas de peso usam `COALESCE(peso_kg, peso_raw)`, unificando num so
+  min/max/avg as leituras antigas (`peso_raw`) e novas (`peso_kg`).
 - Gráfico "Peso bruto (HX711)" → título "Peso (kg)"; série passa a plotar
   `peso_kg` com fallback para `peso_raw`.
 - Tabela: cabeçalho "Peso raw" → "Peso (kg)"; célula formata `peso_kg`
